@@ -115,7 +115,7 @@ Para utilizar los servicios de almacenamiento se puede realizar de dos maneras:
 
   ```
   //ejemplo de almacenamiento en gcloud
-  var Storage = new App.FileStorage("gcloud");
+  var Storage = new App.Storage("gcloud");
   Storage.getContainers().then(function(resp){
     console.log("Lista de containers:");
     console.log(resp);
@@ -142,6 +142,7 @@ Para utilizar los servicios de almacenamiento se puede realizar de dos maneras:
 
     Parámetros:
       * "name": Nombre del contenedor que se va a crear
+      * "public": Flag que indica si el contenedor va a ser público. Por defecto es false.
 
     Ejemplo: 
     
@@ -151,7 +152,8 @@ Para utilizar los servicios de almacenamiento se puede realizar de dos maneras:
 
     ```
     { 
-       "name": "containerExample"
+       "name": "containerExample",
+       "public": true
     }
     ```
       
@@ -222,6 +224,7 @@ Para utilizar los servicios de almacenamiento se puede realizar de dos maneras:
 
       * "path": Path destino del archivo que se va a subir incluyendo el nombre y extensión del mismo.
       * "fileUpload": Archivo que se va a subir.
+      * "public": Flag que indica si el archivo va a ser público. Por defecto es false.
 
     Ejemplo: 
 
@@ -232,6 +235,7 @@ Para utilizar los servicios de almacenamiento se puede realizar de dos maneras:
     ```
      "path" : "file.png"
      "fileUpload": El archivo a subir
+     "public": true
     ```
 
     RESPUESTA: 

@@ -30,14 +30,19 @@ class A2sGcloud{
     log.debug("createContainer");
     log.debug(arg.name);
     var name = arg.name;
+    var public = arg.public;
     return new Promise((resolve, reject) => {
       this.gcs.createBucket(name, (err, bucket) =>{
         if (!err) {
           log.debug(bucket.metadata);
-          bucket.makePublic(err => {
-            if(err) resolve(err)
-            else resolve({_id:name,path: bucket.metadata.selfLink});
-          });
+          if(public){
+            bucket.makePublic(err => {
+              if(err) resolve(err)
+              else resolve({_id:name,path: bucket.metadata.selfLink});
+            });
+          }else{
+            resolve({_id:name,path: bucket.metadata.selfLink});
+          }
         } else{
           log.debug(err);
           reject(err);
@@ -101,12 +106,15 @@ class A2sGcloud{
       var file = arg.file.path;
       // log.debug(file,arg.container);
       var bucket = this.gcs.bucket(arg.container);
+      var public = arg.public;
       var dest = decodeURI(arg.path);
       var options = { destination: arg.path };
 
       bucket.upload(file,options,(err,f) => {
         if(!err){
-          f.makePublic((err, resp) => {});
+          if(public)
+            f.makePublic((err, resp) => {});
+          
           resolve({_id:f.metadata.name,size:f.metadata.size,path:f.metadata.mediaLink});
         }else{
           reject(err);

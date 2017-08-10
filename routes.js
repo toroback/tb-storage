@@ -233,6 +233,7 @@ function setupRoutes(App){
    * @queryparam  {String}  [service] Servicio de almacenamiento en el que crear el contedor. (Ej. "service=gcloud")
    *
    * @bodyparam   {String}  name      Nombre del contenedor que se va a crear
+   * @bodyparam   {String}  public    Flag que indica si el contenedor será público
    * 
    * @return {Container}  El contenedor creado
    *  
@@ -240,7 +241,8 @@ function setupRoutes(App){
    * POST:  http://localhost:4999/api/v1/srv/storage/containers?service=gcloud
    * DATOS: 
    * { 
-   *   "name": "containerExample"
+   *   "name": "containerExample",
+   *   "public" : true
    * }
    * 
    *
@@ -314,6 +316,7 @@ function setupRoutes(App){
    * 
    * @bodyparam  {File}   fileUpload  Archivo que se va a subir
    * @bodyparam  {String} path        Path destino del archivo incluyendo el nombre y extension. Ejemplos: "filename.png", "subdir/filename.png"
+   * @bodyparam  {Boolean}  public    Flag que indica si el archivo será público
    * 
    * @return {Object}  Informacion del archivo subido 
    *

@@ -33,7 +33,7 @@ class AWSStorage{
     log.debug(arg.name);
     var name = arg.name;
     return new Promise((resolve, reject) => {
-      this.awsS3.createBucket({Bucket: name, ACL: "public-read"}, (err, data) => {
+      this.awsS3.createBucket({Bucket: name, ACL: (arg.public ? "public-read" : undefined)}, (err, data) => {
         if (err) reject(err);
         else resolve(bucketObject(this.awsS3, name));
       });
@@ -44,6 +44,7 @@ class AWSStorage{
     log.debug("getContainerInfo");
     return new Promise((resolve,reject) => {
       this.awsS3.headBucket({Bucket: arg.name}, (err, data) => {
+        console.log("getContainerInfo data",data);
         if (err) reject(err); // an error occurred
         else resolve(bucketObject(this.awsS3, arg.name));
       });
@@ -112,7 +113,7 @@ class AWSStorage{
           var params = {
             Bucket: arg.container,
             Key: dest,
-            ACL: 'public-read',
+            ACL: (arg.public ? 'public-read': undefined),
             Body: new Buffer(data, 'binary')
           }
 
@@ -182,7 +183,7 @@ class AWSStorage{
   moveFile(arg) {
     log.debug("moveFile");
     return new Promise((resolve,reject) => {
-      this.awsS3.copyObject({Bucket: arg.container, Key: arg.destFile, CopySource: arg.container+'/'+arg.srcFile, ACL: "public-read" }, (err, data) => {
+      this.awsS3.copyObject({Bucket: arg.container, Key: arg.destFile, CopySource: arg.container+'/'+arg.srcFile, ACL: (arg.public ? "public-read" : undefined) }, (err, data) => {
         if(err){ 
           reject(err); // an error occurred
         }else{
@@ -204,7 +205,7 @@ class AWSStorage{
   copyFile(arg) {
     log.debug("copyFile");
     return new Promise((resolve,reject) => {    
-      this.awsS3.copyObject({Bucket: arg.container, Key: arg.destFile, CopySource: arg.container+'/'+arg.srcFile, ACL: "public-read" }, (err, data) => {
+      this.awsS3.copyObject({Bucket: arg.container, Key: arg.destFile, CopySource: arg.container+'/'+arg.srcFile, ACL: (arg.public ? "public-read" : undefined) }, (err, data) => {
         if(err) reject(err); // an error occurred
         else resolve(fileObject(this.awsS3, arg.srcFile, arg.container, data.ContentLength) );        // successful response
       });  
