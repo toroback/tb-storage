@@ -27,7 +27,7 @@ class Storage{
   }
 
 
-  // multimedia tb module setup. Must be called before any instance creation. 
+  // storage tb module setup. Must be called before any instance creation. 
   static setup(_app) {
     return new Promise( (resolve, reject) => {
       // set globals
@@ -49,10 +49,6 @@ class Storage{
   */
   do(ctx){
     return new Promise((resolve,reject) => {
-      // var clientId = ctx.session.user._id;
-      log.debug(ctx.file);
-      log.debug(ctx.container);
-      
       App.acl.checkActions(ctx, ctx.model, ctx.method)
         .then(() => {
           //Hace la llamada al método correspondiente

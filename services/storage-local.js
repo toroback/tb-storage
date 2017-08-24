@@ -23,9 +23,9 @@ class A2sLocal{
     App = _app;
     log = App.log.child({module:'local-storage'});
 
-    rootUrl = App.serverOptions.host+":"+App.serverOptions.port+"/storage/";
+    rootUrl = App.serverOptions.host+":"+App.serverOptions.port+"/"+path.normalize(_defaultPath)+"/";
 
-    this.rootPath = rootPath || _defaultPath;
+    this.rootPath = rootPath || (App.basePath + "../"+_defaultPath);
     this.options = options;
     log.debug("A2sLocal: "+this.rootPath);
     var that = this;
@@ -43,14 +43,14 @@ class A2sLocal{
     return new Promise((resolve, reject) => {
       var name = arg.name;
       if(checkName(name)){
-        var path = this.rootPath+"/"+name;
-        fs.access(path, err => {
+        var containerPath = path.normalize(this.rootPath+"/"+name);
+        fs.access(containerPath, err => {
           if(err){
-            fs.mkdirs(path, err => {
+            fs.mkdirs(containerPath, err => {
               if(err){
                 reject(err);
               }else{
-                var stat = fs.statSync(path);
+                var stat = fs.statSync(containerPath);
                 resolve({_id:name, size:stat.size});
               }
             });
@@ -68,7 +68,7 @@ class A2sLocal{
   getContainerInfo(arg) {
     log.debug("getContainerInfo");
     return new Promise((resolve,reject) => {
-      var mypath = this.rootPath+"/"+arg.name;
+      var mypath = path.normalize(this.rootPath+"/"+arg.name);
       
       fs.stat(mypath,(err,stat) => {
         if(err){
@@ -111,7 +111,7 @@ class A2sLocal{
             // log.debug(containers);
             var respContainer = [];
             containers.forEach( containerName => {
-              var containerPath = mypath+"/"+containerName;
+              var containerPath = path.normalize(mypath+"/"+containerName);
               var stat = fs.statSync(containerPath);
               if(stat.isDirectory()){
                 respContainer.push({_id:containerName,size:stat.size});
@@ -139,17 +139,26 @@ class A2sLocal{
       
       log.debug(pathDest);
       let fileDest = pathDest+dest;
-      let dir = dest.substr(0, dest.lastIndexOf('/'));
-   
-      if(dir){
-        log.debug(dir);
-        fs.mkdirsSync(pathDest+dir);
+      let relativePath = dest.substr(0, dest.lastIndexOf('/'));
+      let dir = pathDest;
+      if(relativePath){
+        dir = createFilePath(dir,relativePath, undefined);
       }
+
+      log.debug(dir);
+      fs.ensureDirSync(dir);
      
       copyData(fileDest,file)
         .then(() => {
-          let path = createFilePath(rootUrl, arg.container, dest);        
-          resolve({_id:dest,path:path});
+          let obj = {
+            service : "local",
+            container :  arg.container,
+            path : dest,
+            public : true, //por el momento en local siempre es true (arg.public ? true: false),
+            url : createFilePath(rootUrl, arg.container, dest)
+          }
+          resolve(obj);       
+          // resolve({_id:dest,path:path});
           fs.remove(file, err => log.debug("upload temp borrado"));
         })
         .catch(reject);
@@ -405,21 +414,25 @@ function checkName(name){
  * @return {String}          El path creado
  */
 function createFilePath(rootDir, subpath, fileName){
-  let path = rootDir;
+  let filePath = rootDir;
   if(subpath){
     let trimSubpath = subpath.trim();
     if(trimSubpath.length > 0){
-      path = path + "/" + trimSubpath;
+      var containsLeft = filePath.endsWith("/");
+      var containsRight = trimSubpath.startsWith("/");
+      filePath = filePath + path.normalize(((containsLeft || containsRight) ? "" : "/" ) + trimSubpath ); //Se normaliza la parte del path que se va a añadir para que no dupliquen las '/''
     }
   }
 
   if(fileName){
     let trimFileName = fileName.trim();
     if(trimFileName.length > 0){
-      path = path + "/" + trimFileName;
+      var containsLeft = filePath.endsWith("/");
+      var containsRight = trimFileName.startsWith("/");
+      filePath = filePath + path.normalize(((containsLeft || containsRight) ? "" : "/" ) + trimFileName );//Se normaliza la parte del path que se va a añadir para que no dupliquen las '/''
     }
   }
-  return path;
+  return filePath;
 }
 
 

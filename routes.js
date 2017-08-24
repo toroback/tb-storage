@@ -316,7 +316,7 @@ function setupRoutes(App){
    * 
    * @bodyparam  {File}   fileUpload  Archivo que se va a subir
    * @bodyparam  {String} path        Path destino del archivo incluyendo el nombre y extension. Ejemplos: "filename.png", "subdir/filename.png"
-   * @bodyparam  {Boolean}  public    Flag que indica si el archivo será público
+   * @bodyparam  {String} public      "true" Para indicar que el archivo será público. Cualquier otro valor será tomado como no public.
    * 
    * @return {Object}  Informacion del archivo subido 
    *
@@ -362,7 +362,8 @@ function setupRoutes(App){
     if(req.file)
       ctx.payload.file = req.file;
     ctx.payload.path = req.body.path;
-    ctx.payload.body = req.body;
+    ctx.payload.public = req.body.public && req.body.public == 'true';
+    // ctx.payload.body = req.body;
     log.debug(ctx.payload);
     ctx.model = "storage";
     ctx.method = 'uploadFile';

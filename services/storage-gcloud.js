@@ -7,15 +7,15 @@ let log;
 
 var _defaultPath = "./storage";
 
-var appDir = path.dirname(require.main.filename);
+// var appDir = path.dirname(require.main.filename);
 
-let keyFilePath = appDir+"/../cert/";
+let keyFilePath;// = appDir+"/../cert/";
 
 class A2sGcloud{
   constructor(_app, rootPath, options){
     App = _app;
     log = App.log.child({module:'gcloud-storage'});
-
+    keyFilePath = App.certsPath;
     this.rootPath = rootPath || _defaultPath;
     this.options = options;
     log.trace("A2sGcloud INIT");
@@ -30,12 +30,11 @@ class A2sGcloud{
     log.debug("createContainer");
     log.debug(arg.name);
     var name = arg.name;
-    var public = arg.public;
     return new Promise((resolve, reject) => {
       this.gcs.createBucket(name, (err, bucket) =>{
         if (!err) {
           log.debug(bucket.metadata);
-          if(public){
+          if(arg.public){
             bucket.makePublic(err => {
               if(err) resolve(err)
               else resolve({_id:name,path: bucket.metadata.selfLink});
@@ -106,16 +105,24 @@ class A2sGcloud{
       var file = arg.file.path;
       // log.debug(file,arg.container);
       var bucket = this.gcs.bucket(arg.container);
-      var public = arg.public;
       var dest = decodeURI(arg.path);
       var options = { destination: arg.path };
 
       bucket.upload(file,options,(err,f) => {
         if(!err){
-          if(public)
+          if(arg.public)
             f.makePublic((err, resp) => {});
           
-          resolve({_id:f.metadata.name,size:f.metadata.size,path:f.metadata.mediaLink});
+          let obj = {
+            service : "gcloud",
+            container :  arg.container,
+            path : dest,
+            public : (arg.public ? true: false),
+            url : f.metadata.mediaLink
+          }
+          resolve(obj);
+
+          // resolve({_id:f.metadata.name,size:f.metadata.size,path:f.metadata.mediaLink});
         }else{
           reject(err);
         }
@@ -307,11 +314,11 @@ function copyData(savPath, srcPath) {
 //   });
 // }
 
-function cleanPath(path){
+function cleanPath(pathToClean){
   log.debug("entra en clean");
-  fs.readdir(path,(err,folders) => {
+  fs.readdir(pathToClean,(err,folders) => {
     folders.forEach(folder => {
-      var localPath = path+"/"+folder;
+      var localPath = path.normalize(pathToClean+"/"+folder);
       var stat = fs.statSync(localPath);
       if(stat.isDirectory()){
         fs.readdir(localPath,(err,subFolders) => {

@@ -104,7 +104,7 @@ class AWSStorage{
     return new Promise((resolve,reject) => {
       var file = arg.file.path;
       var dest = decodeURI(arg.path);
-
+      console.log("aws arg",arg);
       // Read in the file, convert it to base64, store to S3
       fs.readFile(file, (err, data) => {
         if(err){ 
@@ -121,7 +121,15 @@ class AWSStorage{
             if(err) reject(err);
             else{
               console.log('uploaded!!', data);
-              resolve(fileObject(this.awsS3, dest, arg.container, data.ContentLength));
+
+              let obj = {
+                  service : "aws",
+                  container :  arg.container,
+                  path : dest,
+                  public : (arg.public ? true: false),
+                  url : fileUrl(this.awsS3, arg.container, dest)
+              }
+              resolve(obj);
             }
           });
         }
@@ -183,7 +191,8 @@ class AWSStorage{
   moveFile(arg) {
     log.debug("moveFile");
     return new Promise((resolve,reject) => {
-      this.awsS3.copyObject({Bucket: arg.container, Key: arg.destFile, CopySource: arg.container+'/'+arg.srcFile, ACL: (arg.public ? "public-read" : undefined) }, (err, data) => {
+      let copySource = path.normalize(arg.container+'/'+arg.srcFile);
+      this.awsS3.copyObject({Bucket: arg.container, Key: arg.destFile, CopySource: copySource, ACL: (arg.public ? "public-read" : undefined) }, (err, data) => {
         if(err){ 
           reject(err); // an error occurred
         }else{
