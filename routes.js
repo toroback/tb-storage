@@ -67,11 +67,13 @@ function setupRoutes(App){
     var ctx = req._ctx;
     ctx.payload.container = req.params.container;
     ctx.payload.file = req.params.file;
+    ctx.payload.service = ctx.resource;
+    ctx.payload = processArgs(ctx.payload);
 
     ctx.model = "storage";
     ctx.method = 'getFileInfo';
 
-    getFSInstance(ctx.resource).do(ctx)
+    getFSInstance(ctx.payload.service).do(ctx)
       .then(resp => res.json(resp))
       .catch(next);
   }); //Probado local, gcloud, aws
@@ -106,11 +108,13 @@ function setupRoutes(App){
   router.get("/containers/:container/files",function(req, res, next){
     var ctx = req._ctx;
     ctx.payload.container = req.params.container;
+    ctx.payload.service = ctx.resource;
+    ctx.payload = processArgs(ctx.payload);
 
     ctx.model = "storage";
     ctx.method = 'getFiles';
 
-    getFSInstance(ctx.resource).do(ctx)
+    getFSInstance(ctx.payload.service).do(ctx)
       .then(resp => res.json(resp))
       .catch(next);
   }); //Probado local, gcloud, aws
@@ -141,14 +145,19 @@ function setupRoutes(App){
     var ctx = req._ctx;
     ctx.payload.file = file;
     ctx.payload.container = req.params.container;
+    ctx.payload.service = ctx.resource;
+
     ctx.model = "storage";
     ctx.payload.res = res;//TODO: (sergio) ver esto detenidamente
+
+    ctx.payload = processArgs(ctx.payload);
+
     ctx.method = 'downloadFile';
     // res.setHeader('Content-Type', 'image/png');
     // Content-Disposition: attachment; filename="picture.png"
     res.setHeader('Content-disposition', 'attachment; filename=' + file);
 
-    getFSInstance(ctx.resource).do(ctx)
+    getFSInstance(ctx.payload.service).do(ctx)
       .then(() => {
         log.debug("file downloado ok");
         // res.status(200).json(resp); 
@@ -176,10 +185,11 @@ function setupRoutes(App){
    */
   router.get("/containers",function(req, res, next){
     var ctx = req._ctx;
+    ctx.payload.service = ctx.resource;
     ctx.method = 'getContainers';
     ctx.model = "storage";
 
-    getFSInstance(ctx.resource).do(ctx)
+    getFSInstance(ctx.payload.service).do(ctx)
       .then(resp => res.status(200).json(resp))
       .catch(next);
   }); //Probado local, gcloud, aws
@@ -213,10 +223,13 @@ function setupRoutes(App){
   router.get("/containers/:container",function(req, res, next){
     var ctx = req._ctx;
     ctx.payload.name = req.params.container;
+    ctx.payload.service = ctx.resource;
+    ctx.payload = processArgs(ctx.payload);
+
     ctx.method = 'getContainerInfo';
     ctx.model = "storage";
 
-    getFSInstance(ctx.resource).do(ctx)
+    getFSInstance(ctx.payload.service).do(ctx)
       .then(resp => res.status(200).json(resp))
       .catch(next);
   }); //Probado local, gcloud, aws
@@ -256,10 +269,11 @@ function setupRoutes(App){
    */
   router.post("/containers",function(req, res, next){
     var ctx = req._ctx;
+    ctx.payload.service = ctx.resource;
     ctx.model = "storage";
     ctx.method = 'createContainer';
 
-    getFSInstance(ctx.resource).do(ctx)
+    getFSInstance(ctx.payload.service).do(ctx)
       .then(resp => res.status(200).json(resp))
       .catch(next);
   }); //Probado local, gcloud, aws
@@ -293,10 +307,13 @@ function setupRoutes(App){
   router.delete('/containers/:container', function(req, res, next) { 
     var ctx = req._ctx;
     ctx.payload.name = req.params.container;
+    ctx.payload.service = ctx.resource;
+    ctx.payload = processArgs(ctx.payload);
+
     ctx.model = "storage";
     ctx.method = 'deleteContainer';
 
-    getFSInstance(ctx.resource).do(ctx)
+    getFSInstance(ctx.payload.service).do(ctx)
       .then(resp => res.status(200).json(resp))
       .catch(next);
   }); //Probado local, gcloud, aws
@@ -352,26 +369,53 @@ function setupRoutes(App){
    *   }
    *          
    */
-  router.post("/containers/:container/upload",upload.single('fileUpload'),function(req, res, next){
+  router.post("/upload",upload.single('fileUpload'),function(req, res, next){
     log.trace("entra en upload file");
     log.debug(req.file);
     log.debug(req.body.path);
 
     var ctx = req._ctx;
-    ctx.payload.container = req.params.container;
+    ctx.payload.container = req.query.container;
+    ctx.payload.public = req.query.public && req.query.public == 'true';
+    ctx.payload.reference = req.query.reference;
+    ctx.payload.arg = req.query.arg;
+    ctx.payload.service = ctx.resource;
+
     if(req.file)
       ctx.payload.file = req.file;
     ctx.payload.path = req.body.path;
-    ctx.payload.public = req.body.public && req.body.public == 'true';
+   
+   ctx.payload = processArgs(ctx.payload);
     // ctx.payload.body = req.body;
     log.debug(ctx.payload);
     ctx.model = "storage";
     ctx.method = 'uploadFile';
     
-    getFSInstance(ctx.resource).do(ctx)
+    getFSInstance(ctx.payload.service).do(ctx)
     .then(resp => res.status(200).json(resp))
       .catch(next);
   });  //Probado local, gcloud, aws
+
+  // router.post("/containers/:container/upload",upload.single('fileUpload'),function(req, res, next){
+  //   log.trace("entra en upload file");
+  //   log.debug(req.file);
+  //   log.debug(req.body.path);
+
+  //   var ctx = req._ctx;
+  //   ctx.payload.container = req.params.container;
+  //   if(req.file)
+  //     ctx.payload.file = req.file;
+  //   ctx.payload.path = req.body.path;
+  //   ctx.payload.public = req.body.public && req.body.public == 'true';
+  //   // ctx.payload.body = req.body;
+  //   log.debug(ctx.payload);
+  //   ctx.model = "storage";
+  //   ctx.method = 'uploadFile';
+    
+  //   getFSInstance(ctx.resource).do(ctx)
+  //   .then(resp => res.status(200).json(resp))
+  //     .catch(next);
+  // });  //Probado local, gcloud, aws
 
 
   /**
@@ -403,14 +447,53 @@ function setupRoutes(App){
     var ctx = req._ctx;
     ctx.payload.container = req.params.container;
     ctx.payload.file = req.params.file;
+    ctx.payload.service = ctx.resource;
+    ctx.payload = processArgs(ctx.payload);
+
     ctx.model = "storage";
     ctx.method = 'deleteFile';
-    getFSInstance(ctx.resource).do(ctx)
+    getFSInstance(ctx.payload.service).do(ctx)
       .then(resp => res.status(200).json(resp))
       .catch(next);
   }); //Probado local, gcloud, aws
 
   App.app.use(`${App.baseRoute}/srv/storage`, router);
+}
+
+function processArgs(arg){
+  let newArgs = Object.assign({},arg);
+  if(newArgs){
+    if((!newArgs.service || !newArgs.container) && newArgs.reference){
+      console.log("processing reference");
+      delete newArgs.service;
+      delete newArgs.container;
+
+      if(newArgs.reference){
+        let value = newArgs.reference == 'temporal' ? createRandomString(8) : newArgs.arg;
+        if(value){
+          newArgs.path = path.normalize(value + "/" + newArgs.path);
+        }
+      }
+      // console.log("storageReferences", storageReferences);
+      // let data = storageReferences[newArgs.reference];
+      let data = Storage.toServiceObject({reference: newArgs.reference, path: newArgs.path})
+      if(data){
+        newArgs.service = data.service;
+        newArgs.container = data.container;
+        newArgs.path = data.path;
+      }
+    }else{
+        console.log("processing service");
+      delete newArgs.reference;
+    }
+  }
+  console.log("processed args", newArgs);
+  return newArgs;
+}
+
+function createRandomString(length){
+  var randomstring = require("randomstring");
+  return randomstring.generate(length);
 }
 
 module.exports = setupRoutes;

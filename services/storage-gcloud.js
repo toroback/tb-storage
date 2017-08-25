@@ -112,17 +112,8 @@ class A2sGcloud{
         if(!err){
           if(arg.public)
             f.makePublic((err, resp) => {});
-          
-          let obj = {
-            service : "gcloud",
-            container :  arg.container,
-            path : dest,
-            public : (arg.public ? true: false),
-            url : f.metadata.mediaLink
-          }
-          resolve(obj);
 
-          // resolve({_id:f.metadata.name,size:f.metadata.size,path:f.metadata.mediaLink});
+          resolve({_id:f.metadata.name,size:f.metadata.size,path:f.metadata.mediaLink});
         }else{
           reject(err);
         }

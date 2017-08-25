@@ -54,13 +54,6 @@ class AWSStorage{
   deleteContainer(arg) {
     log.debug("deleteContainer");
     return new Promise((resolve,reject) => { 
-      //Funcion que ejecula la eliminación del bucket
-      // var performDelete = name => {
-      //   this.awsS3.deleteBucket({Bucket: name}, (err, data) => {
-      //     if(err)reject(err); // an error occurred
-      //     else resolve({_id:name}); // successful response
-      //   });
-      // }
 
       let preDelete;
       if(arg.force)
@@ -73,15 +66,6 @@ class AWSStorage{
         .then(resp => resolve({_id:name}))
         .catch(reject);
 
-      // if(arg.force){ //Si es eliminación forzada, eliminar los archivos y despues el bucket
-      //   deleteBucketFiles(this.awsS3, arg.name)
-      //     .then(resp => {
-      //       deleteBucket(this.awsS3, arg.name);  
-      //     })
-      //     .catch(reject);
-      // }else{
-      //   deleteBucket(this.awsS3, arg.name);
-      // }
     });
   }
 
@@ -121,15 +105,8 @@ class AWSStorage{
             if(err) reject(err);
             else{
               console.log('uploaded!!', data);
+              resolve(fileObject(this.awsS3, dest, arg.container, data.ContentLength));
 
-              let obj = {
-                  service : "aws",
-                  container :  arg.container,
-                  path : dest,
-                  public : (arg.public ? true: false),
-                  url : fileUrl(this.awsS3, arg.container, dest)
-              }
-              resolve(obj);
             }
           });
         }

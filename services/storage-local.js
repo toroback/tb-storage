@@ -149,16 +149,8 @@ class A2sLocal{
       fs.ensureDirSync(dir);
      
       copyData(fileDest,file)
-        .then(() => {
-          let obj = {
-            service : "local",
-            container :  arg.container,
-            path : dest,
-            public : true, //por el momento en local siempre es true (arg.public ? true: false),
-            url : createFilePath(rootUrl, arg.container, dest)
-          }
-          resolve(obj);       
-          // resolve({_id:dest,path:path});
+        .then(() => {     
+          resolve({_id:dest,path:createFilePath(rootUrl, arg.container, dest)});
           fs.remove(file, err => log.debug("upload temp borrado"));
         })
         .catch(reject);
