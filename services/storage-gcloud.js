@@ -5,18 +5,16 @@ var path = require('path');
 let App;
 let log;
 
-var _defaultPath = "./storage";
-
 // var appDir = path.dirname(require.main.filename);
 
 let keyFilePath;// = appDir+"/../cert/";
 
 class A2sGcloud{
-  constructor(_app, rootPath, options){
+  constructor(_app, options){
     App = _app;
     log = App.log.child({module:'gcloud-storage'});
     keyFilePath = App.certsPath;
-    this.rootPath = rootPath || _defaultPath;
+  
     this.options = options;
     log.trace("A2sGcloud INIT");
     log.debug(options);
@@ -28,8 +26,8 @@ class A2sGcloud{
 
   createContainer(arg) {
     log.debug("createContainer");
-    log.debug(arg.name);
-    var name = arg.name;
+    log.debug(arg.container);
+    var name = arg.container;
     return new Promise((resolve, reject) => {
       this.gcs.createBucket(name, (err, bucket) =>{
         if (!err) {
@@ -54,7 +52,7 @@ class A2sGcloud{
   getContainerInfo(arg) {
     log.debug("getContainerInfo");
     return new Promise((resolve,reject) => {
-      let bucket = this.gcs.bucket(arg.name);
+      let bucket = this.gcs.bucket(arg.container);
       bucket.getMetadata((err, metadata, apiResponse) => {
         if(err) reject(err);
         else resolve({_id:metadata.id,path:metadata.selfLink})
@@ -65,18 +63,18 @@ class A2sGcloud{
   deleteContainer(arg) {
     log.debug("deleteContainer");
     return new Promise((resolve,reject) => {
-      let bucket = this.gcs.bucket(arg.name);
+      let bucket = this.gcs.bucket(arg.container);
       if(arg.force){
         bucket.deleteFiles({force:true},errors => {
           bucket.delete((err, apiResponse) => {
             if(err)reject(err)
-            else resolve({_id:arg.name});
+            else resolve({_id:arg.container});
           });
         })
       }else{
         bucket.delete((err, apiResponse) => {
           if(err)reject(err)
-          else resolve({_id:arg.name});
+          else resolve({_id:arg.container});
         });
       } 
         
@@ -105,7 +103,7 @@ class A2sGcloud{
       var file = arg.file.path;
       // log.debug(file,arg.container);
       var bucket = this.gcs.bucket(arg.container);
-      var dest = decodeURI(arg.path);
+      var dest = arg.path;
       var options = { destination: arg.path };
 
       bucket.upload(file,options,(err,f) => {
@@ -113,7 +111,8 @@ class A2sGcloud{
           if(arg.public)
             f.makePublic((err, resp) => {});
 
-          resolve({_id:f.metadata.name,size:f.metadata.size,path:f.metadata.mediaLink});
+          let obj = createFileResponseObject(undefined, f.metadata.name, f.metadata.size, f.metadata.mediaLink, arg.public);
+          resolve(obj);
         }else{
           reject(err);
         }
@@ -125,12 +124,18 @@ class A2sGcloud{
   getFiles(arg){
     log.debug("getFiles");
     return new Promise((resolve,reject) => {
-      var bucket = this.gcs.bucket(arg.container);
-      bucket.getFiles((err, files) => {
+      let container = arg.container;
+      let option = {};
+      if(arg.path){
+        option.prefix = arg.path;// = path.join(arg.container, arg.path);
+      }
+      var bucket = this.gcs.bucket(container);
+      bucket.getFiles(option, (err, files) => {
        if (!err) {
           // buckets is an array of Bucket objects.
-          let respFiles = files.map(file =>{
-            return {_id:file.metadata.name,size:file.metadata.size,path:file.metadata.mediaLink};
+          let respFiles = files.map(f =>{
+            return createFileResponseObject(undefined, f.metadata.name, f.metadata.size, f.metadata.mediaLink);
+            // return {_id:file.metadata.name,size:file.metadata.size,path:file.metadata.mediaLink};
           })
           resolve(respFiles);
         }else{
@@ -144,13 +149,15 @@ class A2sGcloud{
     log.debug("getFileInfo");
     return new Promise((resolve,reject) => {
       var bucket = this.gcs.bucket(arg.container);
-      var file = bucket.file(arg.file);
+      var file = bucket.file(arg.path);
       file.getMetadata((err, metadata, apiResponse) => {
         if(err){
           reject(err);
         }else if(metadata){
           log.debug(metadata);
-          resolve({_id:metadata.name,size:metadata.size,path:metadata.selfLink})
+           let obj = createFileResponseObject(undefined, metadata.name, metadata.size, metadata.mediaLink);
+           resolve(obj);
+          // resolve({_id:metadata.name,size:metadata.size,path:metadata.selfLink})
         }else{
           reject(new Error("Metadata don't found"));
         }
@@ -162,7 +169,7 @@ class A2sGcloud{
     log.debug("makeFilePublic");
     return new Promise((resolve,reject) => {
       var bucket = this.gcs.bucket(arg.container);
-      var file = bucket.file(arg.file);
+      var file = bucket.file(arg.path);
       file.makePublic((err, resp) => {
         log.debug("RESP");
         log.debug(resp);
@@ -171,7 +178,9 @@ class A2sGcloud{
             reject(err);
           }else if(metadata){
             log.debug(metadata);
-            resolve({_id:metadata.name,size:metadata.size,path:metadata.selfLink})
+            let obj = createFileResponseObject(undefined, metadata.name, metadata.size, metadata.mediaLink);
+            resolve(obj);
+            // resolve({_id:metadata.name,size:metadata.size,path:metadata.selfLink})
           }else{
             reject(new Error("Metadata don't found"));
           }
@@ -192,7 +201,7 @@ class A2sGcloud{
         }else{
           destinationFile.getMetadata((err, metadata, apiResponse) => {
             if(err) reject(err);
-            else resolve({_id:metadata.name,size:metadata.size,path:metadata.selfLink});
+            else resolve(createFileResponseObject(undefined, metadata.name, metadata.size, metadata.mediaLink));
           });
         }
       });
@@ -211,7 +220,7 @@ class A2sGcloud{
         }else{
           destinationFile.getMetadata((err, metadata, apiResponse) => {
             if(err)reject(err);
-            else resolve({_id:metadata.name,size:metadata.size,path:metadata.selfLink});
+            else resolve(createFileResponseObject(undefined, metadata.name, metadata.size, metadata.mediaLink));
           });
         }
       });
@@ -222,7 +231,7 @@ class A2sGcloud{
     log.debug("getFile");
     return new Promise((resolve, reject) => {
       var bucket = this.gcs.bucket(arg.container); 
-      var remoteFile = bucket.file(arg.file);
+      var remoteFile = bucket.file(arg.path);
 
       var readStream = remoteFile.createReadStream();
       
@@ -240,13 +249,18 @@ class A2sGcloud{
 
   deleteFile(arg) {
     log.debug("deleteFile");
-    var doc = {_id:arg.file};
+    var doc = {_id:arg.path};
     return new Promise((resolve,reject) => {
       var bucket = this.gcs.bucket(arg.container);
-      var file = bucket.file(arg.file);
-      file.delete((err, apiResponse) => {
-        if(err)reject(err)
-        else resolve(doc);
+      var file = bucket.file(arg.path);
+      file.getMetadata((err, metadata, apiResponse) => {
+        if(err)reject(err);
+        else{
+          file.delete((err, apiResponse) => {
+            if(err)reject(err)
+            else resolve(createFileResponseObject(undefined, metadata.name, metadata.size, metadata.mediaLink));
+          });
+        }
       });
     });
   }
@@ -255,13 +269,15 @@ class A2sGcloud{
     log.trace("deleteFiles");
     //var doc = {_id:arg.file};
     return new Promise((resolve,reject) => {
+      let options = {};
+      if(arg.path){
+        options.prefix = arg.path;// = path.join(arg.container, arg.path);
+      }
       var bucket = this.gcs.bucket(arg.container);
-      bucket.deleteFiles({
-          prefix:arg.prefix
-        },err => {
+      bucket.deleteFiles(options ,err => {
           if(!err) resolve();
           else reject(err);
-        })
+      });
     });
   }
 
@@ -336,7 +352,16 @@ function checkName(name){
     return false;
 }
 
+function createFileResponseObject(subPath, relativePath, size, url, public = undefined){
 
+  var info = {_id:relativePath};
+  info.size = size;
+  info.public = public; 
+  info.path = path.join(subPath || "",relativePath);
+  info.url = url;
+
+  return info;
+}
 
 
 

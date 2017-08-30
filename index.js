@@ -11,23 +11,21 @@ let storageReferences = {};
 
 class Storage{
 
-  constructor(service, rootPath, credentials){
-    // this.rootPath = rootPath;
-    // this.credentials = credentials;
+  constructor(service, credentials){
     this.service = service || _defaultService;
     log.trace("servicio %s", this.service);
     switch(this.service){
       case 'local':
         var A2sLocal = require(servicesLocation+"/storage-local.js");
-        this.fsObject = new A2sLocal(App, rootPath);
+        this.fsObject = new A2sLocal(App);
         break;
       case 'gcloud':
         var a2sGcloud = require(servicesLocation+"/storage-gcloud.js");
-        this.fsObject = new a2sGcloud(App, rootPath, credentials || App.storageOptions.gcloud);
+        this.fsObject = new a2sGcloud(App, credentials || App.storageOptions.gcloud);
         break;
       case 'aws':
         var a2sAws = require(servicesLocation+"/storage-aws.js");
-        this.fsObject = new a2sAws(App, rootPath, credentials || App.storageOptions.aws);
+        this.fsObject = new a2sAws(App, credentials || App.storageOptions.aws);
         break;
     }
   }
@@ -58,7 +56,7 @@ class Storage{
     let serviceObject = {
       service:   reference.service,
       container: reference.container,
-      path:      path.normalize(reference.pathPrefix +"/"+ referenceObject.path)
+      path:      path.join(reference.pathPrefix, referenceObject.path || "")
     };
     return serviceObject;
   }
@@ -66,12 +64,14 @@ class Storage{
 
   static toReferenceObject(serviceObject) {
     // let reference = storageReferences[serviceObject.reference];
+    console.log("toReferenceObject",serviceObject);
     let referenceObject = null;
     let objectKeys = Object.keys(storageReferences);
     for (var i = 0; i < objectKeys.length; i++) {
       let refName = objectKeys[i];
     // for ( refName in storageReferences ) {
       let reference = storageReferences[refName];
+      console.log("toReferenceObject ref",reference);
       if ( serviceObject.service == reference.service &&
            serviceObject.container == reference.container &&
            serviceObject.path.startsWith(reference.pathPrefix) )
@@ -84,6 +84,11 @@ class Storage{
       }
     }
     return referenceObject;
+  }
+
+  static getLocalPath(container, subPath){
+    var A2sLocal = require(servicesLocation+"/storage-local.js");
+    return A2sLocal.getLocalPath(App, container, subPath);
   }
 
   // static referenceFromService(arg){
@@ -123,25 +128,7 @@ class Storage{
     });
   };
 
-  getFsObject(service, rootPath,  credentials){
-    // this.service = service || _defaultService
-    // if(service && this.service != service){
-    //   this.service = service;
-    //   switch(this.service){
-    //     case 'local':
-    //       var A2sLocal = require(servicesLocation+"/storage-local.js");
-    //       this.fsObject = new A2sLocal(App, rootPath);
-    //       break;
-    //     case 'gcloud':
-    //       var a2sGcloud = require(servicesLocation+"/storage-gcloud.js");
-    //       this.fsObject = new a2sGcloud(App, rootPath, credentials || App.storageOptions.gcloud);
-    //       break;
-    //     case 'aws':
-    //       var a2sAws = require(servicesLocation+"/storage-aws.js");
-    //       this.fsObject = new a2sAws(App, rootPath, credentials || App.storageOptions.aws);
-    //       break;
-    //   }
-    // }
+  getFsObject(){
     return this.fsObject;
   }
   
@@ -155,7 +142,8 @@ class Storage{
   createContainer(arg) {
     return new Promise((resolve, reject) => {
       // arg = processArgs(arg);
-      this.getFsObject(arg.service).createContainer(arg)
+      arg = normalizeArgs(arg);
+      this.getFsObject().createContainer(arg)
         .then(doc => {
           resolve({container:doc});
         })
@@ -173,9 +161,11 @@ class Storage{
   getFileInfo(arg){
     return new Promise((resolve, reject) => {
       // arg = processArgs(arg);
-      this.getFsObject(arg.service).getFileInfo(arg)
+      arg = normalizeArgs(arg);
+      this.getFsObject().getFileInfo(arg)
         .then(doc => {
-          resolve({file:doc});
+          let obj = createFileForResponse(this.service, arg, doc.path, doc.url, doc.public);
+          resolve({file:obj});
         })
         .catch(reject); 
     });
@@ -206,9 +196,11 @@ class Storage{
   getFiles(arg){
     return new Promise((resolve, reject) => {
       // arg = processArgs(arg);
-      this.getFsObject(arg.service).getFiles(arg)
+      arg = normalizeArgs(arg);
+      this.getFsObject().getFiles(arg)
         .then(docs => {
-          resolve({files:docs});
+          let objs = docs ? docs.map(doc => createFileForResponse(this.service, arg, doc.path, doc.url, doc.public)) : []
+          resolve({files:objs});
         })
         .catch(reject); 
     });
@@ -219,13 +211,14 @@ class Storage{
    * @function downloadFile
    * @param {arg} payload - Objeto payload que recibe el metodo
    * @param {string} payload.container - nombre del contenedor donde se encuentra dicho archivo (opcional)
-   * @param {string} payload.file - nombre del archivo que se desea descargar donde se 
+   * @param {string} payload.path - nombre del archivo que se desea descargar donde se 
    * @param {Object} payload.res - objecto donde se devuelve el fichero (tipo de objeto <stream.Writable>)
   */
   downloadFile(arg){
     return new Promise((resolve, reject) => {
       // arg = processArgs(arg);
-      this.getFsObject(arg.service).getFile(arg)
+      arg = normalizeArgs(arg);
+      this.getFsObject().getFile(arg)
         .then(docs => resolve())
         .catch(reject); 
     });
@@ -240,7 +233,8 @@ class Storage{
   getContainerInfo(arg){
     return new Promise((resolve, reject) => {
       // arg = processArgs(arg);
-      this.getFsObject(arg.service).getContainerInfo(arg)
+      arg = normalizeArgs(arg);
+      this.getFsObject().getContainerInfo(arg)
         .then(doc => {
           resolve({container:doc});
         })
@@ -255,7 +249,8 @@ class Storage{
   getContainers(arg){
     return new Promise((resolve, reject) => {
       // arg = processArgs(arg);
-      this.getFsObject(arg.service).getContainers(arg)
+      arg = normalizeArgs(arg);
+      this.getFsObject().getContainers(arg)
         .then(docs => {
           resolve({containers:docs});
         })
@@ -276,22 +271,20 @@ class Storage{
   uploadFile(arg){
     return new Promise((resolve, reject) => {
       // arg = processArgs(arg);
-      
-      this.getFsObject(arg.service).uploadFile(arg)
+      arg = normalizeArgs(arg);
+      this.getFsObject().uploadFile(arg)
         .then(doc => {
-          let obj = {
-             
-          }
-          if(arg.reference){
-            obj = Storage.toReferenceObject({service: this.service, container: arg.container, path: arg.path});
-            // obj.reference = arg.reference;
-          }else{
-            obj.path = arg.path;
-            obj.service = this.service,
-            obj.container =  arg.container,
-            obj.public = arg.public || false, //por el momento en local siempre es true (arg.public ? true: false),
-            obj.url = doc.path
-          } 
+          let obj = createFileForResponse(this.service, arg, doc.path, doc.url, doc.public);
+          // let obj = {}
+          // if(arg.reference){
+          //   obj = Storage.toReferenceObject({service: this.service, container: arg.container, path: arg.path});
+          // }else{
+          //   obj.path = arg.path;
+          //   obj.service = this.service,
+          //   obj.container =  arg.container,
+          //   obj.public = arg.public || false, //por el momento en local siempre es true (arg.public ? true: false),
+          //   obj.url = doc.path
+          // } 
           resolve({file:obj});
         })
         .catch(reject); 
@@ -307,8 +300,9 @@ class Storage{
   */
   deleteContainer(arg){
     return new Promise((resolve, reject) => {
+      arg = normalizeArgs(arg);
       // arg = processArgs(arg);
-      this.getFsObject(arg.service).deleteContainer(arg)
+      this.getFsObject().deleteContainer(arg)
         .then(doc => {
           resolve({container:doc});
         })
@@ -325,10 +319,12 @@ class Storage{
   */
   deleteFile(arg){
     return new Promise((resolve, reject) => {
+      arg = normalizeArgs(arg);
       // arg = processArgs(arg);
-      this.getFsObject(arg.service).deleteFile(arg)
+      this.getFsObject().deleteFile(arg)
         .then(doc => {
-          resolve({file:doc});
+          let obj = createFileForResponse(this.service, arg, doc.path, undefined, doc.public); //cuando se elimina no devuelvo la url
+          resolve({file:obj});
         })
         .catch(reject); 
     });
@@ -343,14 +339,29 @@ class Storage{
   */
   deleteFiles(arg){
     return new Promise((resolve, reject) => {
+      arg = normalizeArgs(arg);
       // arg = processArgs(arg);
-      this.getFsObject(arg.service).deleteFiles(arg)
-        .then(doc => {
-          resolve({file:doc});
+      this.getFsObject().deleteFiles(arg)
+        .then(docs => {
+          let objs = docs ? docs.map(doc => createFileForResponse(this.service, arg, doc.path, doc.url, doc.public)) : []
+          resolve({files:objs});
         })
         .catch(reject); 
     });
   };
+
+  makeFilePublic(arg){
+    return new Promise((resolve, reject) => {
+      arg = normalizeArgs(arg);
+      
+      this.getFsObject().makeFilePublic(arg)
+        .then(doc => {
+          let obj = createFileForResponse(this.service, arg, doc.path, doc.url, doc.public);
+          resolve({file:obj});
+        })
+        .catch(reject); 
+    });
+  }
 
 }
 
@@ -358,28 +369,38 @@ function newContainer(name, path, stat){
   return {_id:name, path:path, size:stat.size};
 }
 
-// function processArgs(arg){
-//   let newArgs = Object.assign({},arg);
-//   if(newArgs){
-//     if((!newArgs.service || !newArgs.container) && newArgs.reference){
-//       console.log("processing reference");
-//       delete newArgs.service;
-//       delete newArgs.container;
-//       console.log("storageReferences", storageReferences);
-//       let data = storageReferences[newArgs.reference];
-//       if(data){
-//         newArgs.service = data.service;
-//         newArgs.container = data.container;
-//         newArgs.pathPrefix = data.pathPrefix;
-//       }
-//     }else{
-//         console.log("processing service");
-//       delete newArgs.reference;
-//     }
-//   }
-//   console.log("processed args", newArgs);
-//   return newArgs;
-// }
+function createFileForResponse(service, reqArgs, path, url, public){
+  let obj = {};
+  if(reqArgs.reference){
+    obj = Storage.toReferenceObject({service: service, container: reqArgs.container, path: path});
+  }else{
+    obj.path = path;
+    obj.service = service,
+    obj.container =  reqArgs.container,
+    obj.public = public || false, //por el momento en local siempre es true (arg.public ? true: false),
+    obj.url = url
+  } 
+  return obj;
+}
+
+/**
+ * Funcion que normaliza los argumentos. 
+ * @param  {[type]} arg [description]
+ * @return {[type]}     [description]
+ */
+function normalizeArgs(arg){
+  let newArgs = Object.assign({},arg);
+  if(newArgs.container){
+    if(newArgs.service == "aws"){ //para amazon se pasa el contenedor a minuscula
+      newArgs.container = newArgs.container.toLowerCase();
+    }
+  }
+
+  if(newArgs.path && newArgs.path.startsWith("/")){
+    newArgs.path = newArgs.path.substring(1);
+  }
+  return newArgs;
+}
 
 
 

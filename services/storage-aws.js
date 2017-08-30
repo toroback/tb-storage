@@ -1,6 +1,7 @@
 
 var AWS = require('aws-sdk');
 var fs = require('fs-extra');
+var path = require('path');
 
 let App;
 let log;
@@ -9,15 +10,12 @@ let log;
 // --> si this.awsS3 está fuera de los prototype, funciona? no he probado.
 // --> no, no funciona.... le puse el prototype a todos mientras reorganizamos este módulo
 // var rootPath = null;
-var _defaultPath = "./storage";
 let _defaultRegion = 'eu-central-1';
 
 class AWSStorage{
-  constructor(_app, rootPath, options){
+  constructor(_app, options){
     App = _app;
     log = App.log.child({module:'aws-storage'});
-
-    this.rootPath = rootPath || _defaultPath;
     this.options = options;
     log.trace("AWSStorage INIT");
     log.debug(options);
@@ -30,8 +28,8 @@ class AWSStorage{
 
   createContainer(arg) {
     log.debug("createContainer");
-    log.debug(arg.name);
-    var name = arg.name;
+    log.debug(arg.container);
+    var name = arg.container;
     return new Promise((resolve, reject) => {
       this.awsS3.createBucket({Bucket: name, ACL: (arg.public ? "public-read" : undefined)}, (err, data) => {
         if (err) reject(err);
@@ -43,10 +41,10 @@ class AWSStorage{
   getContainerInfo(arg) {
     log.debug("getContainerInfo");
     return new Promise((resolve,reject) => {
-      this.awsS3.headBucket({Bucket: arg.name}, (err, data) => {
+      this.awsS3.headBucket({Bucket: arg.container}, (err, data) => {
         console.log("getContainerInfo data",data);
         if (err) reject(err); // an error occurred
-        else resolve(bucketObject(this.awsS3, arg.name));
+        else resolve(bucketObject(this.awsS3, arg.container));
       });
     });
   }
@@ -57,13 +55,13 @@ class AWSStorage{
 
       let preDelete;
       if(arg.force)
-        preDelete = deleteBucketFiles(this.awsS3, arg.name);
+        preDelete = deleteBucketFiles(this.awsS3, arg.container);
       else
         preDelete = Promise.resolve();
       
       preDelete
-        .then(resp => deleteBucket(this.awsS3, arg.name))
-        .then(resp => resolve({_id:name}))
+        .then(resp => deleteBucket(this.awsS3, arg.container))
+        .then(resp => resolve({_id:arg.container}))
         .catch(reject);
 
     });
@@ -87,7 +85,7 @@ class AWSStorage{
     log.debug("uploadFile");
     return new Promise((resolve,reject) => {
       var file = arg.file.path;
-      var dest = decodeURI(arg.path);
+      var dest = arg.path;
       console.log("aws arg",arg);
       // Read in the file, convert it to base64, store to S3
       fs.readFile(file, (err, data) => {
@@ -119,10 +117,15 @@ class AWSStorage{
   getFiles(arg){
     log.debug("getFiles");
     return new Promise((resolve,reject) => {
-      this.awsS3.listObjectsV2({Bucket: arg.container}, (err, data) => {
+      let container = arg.container;
+      let params = {Bucket: container};
+      if(arg.path){
+        params.Prefix = arg.path;
+      }
+      this.awsS3.listObjectsV2(params, (err, data) => {
         if(err) reject(err); // an error occurred
         else{
-          var respFiles = data.Contents.map(file => fileObject(this.awsS3, file.Key, arg.container, file.Size));
+          var respFiles = data.Contents.map(file => fileObject(this.awsS3, file.Key, container, file.Size));
           resolve(respFiles);
         }    
       });
@@ -132,13 +135,13 @@ class AWSStorage{
   getFileInfo(arg) {
     log.debug("getFileInfo");
     return new Promise((resolve,reject) => {
-      this.awsS3.headObject({Bucket: arg.container, Key: arg.file}, (err, data) => {
+      this.awsS3.headObject({Bucket: arg.container, Key: arg.path}, (err, data) => {
         if(err){ 
           reject(err); // an error occurred
         }else if(!data){
           reject(new Error("File not found"));
         }else{
-          resolve(fileObject(this.awsS3, arg.file, arg.container, data.ContentLength));
+          resolve(fileObject(this.awsS3, arg.path, arg.container, data.ContentLength));
         }     
       });
     });
@@ -147,17 +150,17 @@ class AWSStorage{
   makeFilePublic(arg) {
     log.debug("makeFilePublic");
     return new Promise((resolve,reject) => {
-      this.awsS3.putObjectAcl({Bucket: arg.container, Key: arg.file, ACL: 'public-read'}, (err, data) => {
+      this.awsS3.putObjectAcl({Bucket: arg.container, Key: arg.path, ACL: 'public-read'}, (err, data) => {
         if(err){
           reject(err); // an error occurred
         }else{
-          this.awsS3.headObject({Bucket: arg.container, Key: arg.file}, (err, data) => {
+          this.awsS3.headObject({Bucket: arg.container, Key: arg.path}, (err, data) => {
             if(err){ 
               reject(err); // an error occurred
             }else if(!data){
               reject(new Error("File not found"));
             }else{
-              resolve(fileObject(this.awsS3, arg.file, arg.container, data.ContentLength));
+              resolve(fileObject(this.awsS3, arg.path, arg.container, data.ContentLength));
             }     
           });
         }     
@@ -201,7 +204,7 @@ class AWSStorage{
   getFile(arg){
     log.debug("getFile");
     return new Promise((resolve, reject) => {
-      var readStream = this.awsS3.getObject({Bucket: arg.container, Key: arg.file}).createReadStream();
+      var readStream = this.awsS3.getObject({Bucket: arg.container, Key: arg.path}).createReadStream();
 
       readStream.on('error', (error) => {
         log.debug(error);
@@ -218,15 +221,15 @@ class AWSStorage{
   deleteFile(arg) {
     log.debug("deleteFile");
     return new Promise((resolve,reject) => {
-      this.awsS3.deleteObject({Bucket: arg.container, Key: arg.file}, (err, data) => {
+      this.awsS3.deleteObject({Bucket: arg.container, Key: arg.path}, (err, data) => {
         if(err) reject(err); // an error occurred
-        else resolve({_id:arg.file});           // successful response
+        else resolve(fileObject(this.awsS3, arg.path, arg.container, 0));           // successful response
       });
     });
   }
 
   deleteFiles(arg){
-    return deleteBucketFiles(this.awsS3, arg.container, arg.prefix);
+    return deleteBucketFiles(this.awsS3, arg.container, arg.path);
   } 
 
 }
@@ -261,8 +264,8 @@ class AWSStorage{
    * @param  {Number} size   Tamaño del arhivo (Opcional)
    * @return {Object}        Un objeto con la información
    */
-  function fileObject(awsS3, name, bucket, size){
-    let obj = {_id: name, path: fileUrl(awsS3, bucket, name)};
+  function fileObject(awsS3, name, bucket, size, public = undefined){
+    let obj = {_id: name, url: fileUrl(awsS3, bucket, name), path: name, public: public};
     if(size) obj.size = size;
     return obj;
   }

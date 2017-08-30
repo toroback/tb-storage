@@ -132,30 +132,22 @@ Para utilizar los servicios de almacenamiento se puede realizar de dos maneras:
 
 ### - **REST Api**.
 
-  Las peticiones http se deben realizar a la url "https://[domain]:[port]/api/v[apiVersion]/srv/storage/containers"
+  Las peticiones http se deben realizar a la url "https://[domain]:[port]/api/v[apiVersion]/srv/storage/"
 
   Las peticiones que se pueden realizar son:
   
   - Crear un nuevo contenedor:
 
-    Realizar una peticion POST a https://[domain]:[port]/api/v[apiVersion]/srv/storage/containers[?service=< service >]
+    Realizar una peticion POST a https://[domain]:[port]/api/v[apiVersion]/srv/storage?service=< service >&container=< container >[&public=< true | false >]
 
     Parámetros:
-      * "name": Nombre del contenedor que se va a crear
+      * "service": Servicio en el que se encontrará el contenedor
+      * "container": Nombre del contenedor que se va a crear
       * "public": Flag que indica si el contenedor va a ser público. Por defecto es false.
 
     Ejemplo: 
     
-    POST:  https://a2server.a2system.net:1234/api/v1/srv/storage/containers?service=gcloud
-
-    DATOS:
-
-    ```
-    { 
-       "name": "containerExample",
-       "public": true
-    }
-    ```
+    POST:  https://a2server.a2system.net:1234/api/v1/srv/storage?service=gcloud&container=my-container&public=true
       
     RESPUESTA:
 
@@ -168,32 +160,13 @@ Para utilizar los servicios de almacenamiento se puede realizar de dos maneras:
     } 
     ```
 
-  - Obtener información de un contenedor por su nombre:
+  - Eliminar un contenedor :
 
-    Realizar una peticion GET a https://[domain]:[port]/api/v[apiVersion]/srv/storage/containers/< nombre_contenedor >[?service=< service>]
-  
-    Ejemplo: 
-    
-    GET: https://a2server.a2system.net:1234/api/v1/srv/storage/containers/containerExample
-       
-    RESPUESTA:
-
-    ```
-    {
-      "container": {
-        "_id": "containerExample",
-        "path": "https://www.googleapis.com/storage/v1/b/containerExample"
-      }
-    }   
-    ```
-
-  - Eliminar un contenedor por su nombre:
-
-    Realizar una peticion DELETE a https://[domain]:[port]/api/v[apiVersion]/srv/storage/containers/< nombre_contenedor >[?service=< service >]
+    Realizar una peticion DELETE a https://[domain]:[port]/api/v[apiVersion]/srv/storage?service=< service >&container=< container >
   
     Ejemplo: 
       
-    DELETE: https://a2server.a2system.net:1234/api/v1/srv/storage/containers/containerExample?service=gcloud
+    DELETE: https://a2server.a2system.net:1234/api/v1/srv/storage?service=gcloud&container=containerExample
    
     RESPUESTA:
 
@@ -207,74 +180,98 @@ Para utilizar los servicios de almacenamiento se puede realizar de dos maneras:
 
   - Listar los contenedores existentes:
 
-    Realizar una peticion GET a https://[domain]:[port]/api/v[apiVersion]/srv/storage/containers[?service=< service >]
+    Realizar una peticion GET a https://[domain]:[port]/api/v[apiVersion]/srv/storage?service=< service >
   
     Ejemplo: 
       
-    GET: https://localhost:4999/storage/containers  para los contenedores locales
+    GET: https://localhost:4999/storage?service=local  para los contenedores locales
 
-    GET: https://localhost:4999/storage/containers?service=gcloud  para los contenedores de gcloud
+    GET: https://localhost:4999/storage?service=gcloud  para los contenedores de gcloud
       
 
   - Subir un archivo a un contenedor:
 
-    Realizar una peticion POST multipart a https://[domain]:[port]/api/v[apiVersion]/srv/storage/containers/< nombre_contenedor >/upload[?service=< service >]
+    Realizar una peticion POST multipart a https://[domain]:[port]/api/v[apiVersion]/srv/storage/upload?service=< service >&container=< container >&public= < true | false >
+
+    O se puede realizar mediante una referencia:
+
+      POST multipart a https://[domain]:[port]/api/v[apiVersion]/srv/storage/upload?reference=< reference >&public= < true | false >
+
+
+    Parámetros:
+
+      * "service": Servicio al que se subira el archivo
+      * "container": Nombre del contenedor al que se subira el archivo
+      * "reference": Nombre de la referencia a la que se subira el archivo
+      * "public": Flag que indica si el archivo va a ser público. Por defecto es false.
 
     Parámetros multipart:
 
       * "path": Path destino del archivo que se va a subir incluyendo el nombre y extensión del mismo.
       * "fileUpload": Archivo que se va a subir.
-      * "public": Flag que indica si el archivo va a ser público. Por defecto es false.
+      
 
     Ejemplo: 
 
-    UPLOAD: https://localhost:4999/storage/containers/containerExample/upload?service=gcloud
+    UPLOAD: https://localhost:4999/storage/upload?service=gcloud&service=containerExample
 
     DATOS multipart:
 
     ```
      "path" : "file.png"
      "fileUpload": El archivo a subir
-     "public": true
     ```
 
     RESPUESTA: 
 
     ```
-    {
-      "file": {
-        "_id": "file.png",
-        "size": "131829",
-        "path": "https://www.googleapis.com/download/storage/v1/b/containerExample/o/file.png?generation=1499774991897264&alt=media"
-      }
-    }
+     {
+       "file": {
+         "path": "file.png",
+         "service": "gcloud",
+         "container": "test-container",
+         "public": true,
+         "url": "https://www.googleapis.com/download/storage/v1/b/containerExample/o/file.png?generation=1504095147348420&alt=media"
+       }
+     }
     ```
 
   - Eliminar un archivo ya subido:
 
-    Realizar una peticion DELETE a https://[domain]:[port]/api/v[apiVersion]/srv/storage/containers/< nombre_contenedor >/files/< nombre_archivo >[?service=< service >]
+    Realizar una peticion DELETE a https://[domain]:[port]/api/v[apiVersion]/srv/storage?service=< service >&container=< container >&path=< path>
+
+    O se puede realizar mediante una referencia:
+
+      POST multipart a https://[domain]:[port]/api/v[apiVersion]/srv/storage?reference=< reference >&public= < true | false >&path=< path>
 
     Ejemplo: 
  
-    DELETE: https://a2server.a2system.net:1234/api/v1/srv/storage/containers/containerExample/files/subdir%2Ffile.png
+    DELETE: https://a2server.a2system.net:1234/api/v1/srv/storage?service=gcloud&container=containerExample&path=file.png
    
     RESPUESTA: 
 
     ```
      {
        "file": {
-         "_id": "subdir/file.png"
+         "path": "file.png",
+         "service": "gcloud",
+         "container": "test-container",
+         "public": true
        }
      }
     ```
 
   - Obtener los archivos de un contenedor:
 
-    Realizar una peticion GET a https://[domain]:[port]/api/v[apiVersion]/srv/storage/containers/< nombre_contenedor >/files[?service=< service >]
+    Realizar una peticion GET a https://[domain]:[port]/api/v[apiVersion]/srv/storage?service=< service >&container=< container >[&path=< subDir path >]
+
+      O se puede realizar mediante una referencia:
+
+      POST multipart a https://[domain]:[port]/api/v[apiVersion]/srv/storage?reference=< reference >[&path=< subDir path >]
 
     Ejemplo: 
       
-    GET: https://a2server.a2system.net:1234/api/v1/srv/storage/containers/containerExample/files?service=gcloud
+    GET: https://a2server.a2system.net:1234/api/v1/srv/storage?service=gcloud&container=containerExample
 
     RESPUESTA:
 
@@ -282,9 +279,11 @@ Para utilizar los servicios de almacenamiento se puede realizar de dos maneras:
      {
         "files": [
           {
-            "_id": "file.jpg",
-            "size": "131829",
-            "path": "https://www.googleapis.com/download/storage/v1/b/containerExample/o/file.jpg?generation=1499779049548839&alt=media"
+            "path": "file.png",
+            "service": "gcloud",
+            "container": "test-container",
+            "public": true,
+            "url": "https://www.googleapis.com/download/storage/v1/b/containerExample/o/file.png?generation=1504095147348420&alt=media"
           }
         ]
      }
@@ -292,31 +291,41 @@ Para utilizar los servicios de almacenamiento se puede realizar de dos maneras:
 
   - Obtener la información de un archivo dentro del contenedor:
 
-    Realizar una peticion GET a https://[domain]:[port]/api/v[apiVersion]/srv/storage/containers/< nombre_contenedor >/files/< nombre_archivo >[?service=< service >]
+    Realizar una peticion GET a https://[domain]:[port]/api/v[apiVersion]/srv/storage?service=< service >&container=< container >&path=< path >
+
+      O se puede realizar mediante una referencia:
+
+      POST multipart a https://[domain]:[port]/api/v[apiVersion]/srv/storage?reference=< reference >&path=< path >
 
     Ejemplo: 
      
-    GET: https://a2server.a2system.net:1234/api/v1/srv/storage/containers/containerExample/files/file.jpg?service=gcloud
+    GET: https://a2server.a2system.net:1234/api/v1/srv/storage?service=gcloud&container=containerExample&path=file.jpg
        
     RESPUESTA:
 
     ```
     {
        "file": {
-         "_id": "file.jpg",
-         "size": "131829",
-         "path": "https://www.googleapis.com/storage/v1/b/containerExample/o/file.jpg"
-       }
+          "path": "file.png",
+          "service": "gcloud",
+          "container": "test-container",
+          "public": true,
+          "url": "https://www.googleapis.com/download/storage/v1/b/containerExample/o/file.png?generation=1504095147348420&alt=media"
+        }
     }
     ```
 
   - Descargar un archivo subido:
 
-    Realizar una peticion GET a https://[domain]:[port]/api/v[apiVersion]/srv/storage/containers/< nombre_contenedor >/download/< nombre_archivo >[?service=< service >]
+    Realizar una peticion GET a https://[domain]:[port]/api/v[apiVersion]/srv/storage/download?service=< service >&container=< container >&path=< path >
 
+     O se puede realizar mediante una referencia:
+
+      POST multipart a https://[domain]:[port]/api/v[apiVersion]/srv/storage?reference=< reference >&path=< path >
+      
     Ejemplo: 
       
-    GET: https://a2server.a2system.net:1234/api/v1/srv/storage/containers/containerExample/download/file.jpg?service=gcloud
+    GET: https://a2server.a2system.net:1234/api/v1/srv/storage/download?service=gcloud&container=containerExample&path=file.png
            
     
 

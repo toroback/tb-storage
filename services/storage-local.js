@@ -18,14 +18,14 @@ var _defaultPath = "./storage";
 
 
 class A2sLocal{
-  constructor(_app, rootPath, options){
+  constructor(_app, options){
 
     App = _app;
     log = App.log.child({module:'local-storage'});
 
     rootUrl = App.serverOptions.host+":"+App.serverOptions.port+"/"+path.normalize(_defaultPath)+"/";
 
-    this.rootPath = rootPath || (App.basePath + "../"+_defaultPath);
+    this.rootPath = App.basePath + "../"+_defaultPath;
     this.options = options;
     log.debug("A2sLocal: "+this.rootPath);
     var that = this;
@@ -38,12 +38,16 @@ class A2sLocal{
     });
   }
 
+  static getLocalPath(app, container, subPath){
+    return path.normalize(app.basePath, "..", _defaultPath, container, subPath);
+  }
+
   createContainer(arg) {
     log.debug("createContainer");
     return new Promise((resolve, reject) => {
-      var name = arg.name;
+      var name = arg.container;
       if(checkName(name)){
-        var containerPath = path.normalize(this.rootPath+"/"+name);
+        var containerPath = path.join(this.rootPath, name);
         fs.access(containerPath, err => {
           if(err){
             fs.mkdirs(containerPath, err => {
@@ -68,14 +72,14 @@ class A2sLocal{
   getContainerInfo(arg) {
     log.debug("getContainerInfo");
     return new Promise((resolve,reject) => {
-      var mypath = path.normalize(this.rootPath+"/"+arg.name);
+      var mypath = path.join(this.rootPath, arg.container);
       
       fs.stat(mypath,(err,stat) => {
         if(err){
           console.log(err);
           reject(App.err.notFound("container not found"));
         }else{          
-          resolve({_id:arg.name, size:stat.size});
+          resolve({_id:arg.container, size:stat.size});
         }
       });
     });
@@ -85,14 +89,14 @@ class A2sLocal{
     // var mypath = __dirname+"/../../app/fs/"+arg.container;
     log.debug("deleteContainer");
     return new Promise((resolve,reject) => {
-      var mypath = createFilePath(this.rootPath, undefined, arg.name);
+      var mypath = createFilePath(this.rootPath, undefined, arg.container);
       fs.stat(mypath, (err,stat) => {
         if(err){
           reject(new Error("container not found"));
         }else{
           fs.remove(mypath, err => {
             if(err)reject(err);
-            resolve({_id:arg.name});
+            resolve({_id:arg.container});
           });
         }
       });
@@ -111,7 +115,7 @@ class A2sLocal{
             // log.debug(containers);
             var respContainer = [];
             containers.forEach( containerName => {
-              var containerPath = path.normalize(mypath+"/"+containerName);
+              var containerPath = path.join(mypath, containerName);
               var stat = fs.statSync(containerPath);
               if(stat.isDirectory()){
                 respContainer.push({_id:containerName,size:stat.size});
@@ -133,7 +137,7 @@ class A2sLocal{
     return new Promise((resolve,reject) => {
       let file = arg.file.path;
       log.debug(file,arg.container);
-      let dest = decodeURI(arg.path);
+      let dest = arg.path;
       
       let pathDest = createFilePath(this.rootPath, arg.container, undefined) + "/";
       
@@ -149,9 +153,21 @@ class A2sLocal{
       fs.ensureDirSync(dir);
      
       copyData(fileDest,file)
-        .then(() => {     
-          resolve({_id:dest,path:createFilePath(rootUrl, arg.container, dest)});
-          fs.remove(file, err => log.debug("upload temp borrado"));
+        .then(() => {
+          fs.stat(fileDest, (err,stat) => {
+            if(err){
+              reject(App.err.notFound("file not found"))
+            }else{   
+              let respObj = createFileResponseObject(arg.container, undefined, dest, stat.mtime, stat.size, true);
+              // let respObj = {
+              //   _id:dest,
+              //   path:createFilePath(rootUrl, arg.container, dest),
+              //   public: true //De momento lo locales son siempre public  
+              // }
+              resolve(respObj);
+              fs.remove(file, err => log.debug("upload temp borrado"));
+            }
+          });
         })
         .catch(reject);
     });
@@ -162,12 +178,17 @@ class A2sLocal{
     log.debug("getFiles");
     // var container = {_id:name,path:rootUrl+name};
     return new Promise((resolve,reject) =>{
+     
       var mypath = this.rootPath+"/";
       if(arg.container){
-        mypath = mypath+arg.container+"/";
-      }else if(arg.path){
-        mypath = mypath+arg.path;
+        mypath =  path.join(mypath,arg.container)+"/";
       }
+
+      if(arg.path){
+        mypath = path.join(mypath,arg.path);
+      }
+
+      // let baseFileUrl = createFilePath(rootUrl, arg.container, arg.path);
 
       fs.stat(mypath, (err,stat) => {
         if(err){
@@ -183,10 +204,14 @@ class A2sLocal{
                   filePath = filePath.replace(rootPath,"");
                   // log.debug(filePath);
                   // var name = filePath.substr(filePath.indexOf(arg.container)+arg.container.length+1);
-                  var name = filePath;
-                  var info = {_id:name};
-                  info.mtime = stat.mtime.getTime()/1000;
-                  info.size = stat.size;
+                  var info = createFileResponseObject(arg.container, arg.path, filePath, stat.mtime, stat.size, true);
+                  // var name = filePath;
+                  // var info = {_id:name};
+                  // info.mtime = stat.mtime.getTime()/1000;
+                  // info.size = stat.size;
+                  // info.public = true; //De momento lo locales son siempre public
+                  // info.path = filePath;
+                  // info.url = createFilePath(baseFileUrl,filePath);
                   respFiles.push(info);
                 }
               });
@@ -203,12 +228,17 @@ class A2sLocal{
                   //quitar dirname de la url
                   isDir = false;
                 }
-                var name = filePath;
-                var info = {_id:name};
-                info.type = "file";
-                if(isDir) info.type = "dir";
-                info.mtime = stat.mtime.getTime()/1000;
-                info.size = stat.size;
+                var info = createFileResponseObject(arg.container, arg.path, filePath, stat.mtime, stat.size, true);
+
+                // var name = filePath;
+                // var info = {_id:name};
+                // info.type = "file";
+                // if(isDir) info.type = "dir";
+                // info.mtime = stat.mtime.getTime()/1000;
+                // info.size = stat.size;
+                // info.public = true; //De momento lo locales son siempre public
+                // info.path = filePath;
+                // info.url = createFilePath(baseFileUrl,filePath);
                 respFiles.push(info);
               });
               resolve(respFiles);
@@ -222,16 +252,21 @@ class A2sLocal{
   getFileInfo(arg) {
     // var mypath = __dirname+"/../../app/fs/"+arg.container+"/"+arg.file;
     log.debug("getFileInfo");
-    var info = {_id:arg.file};
+    // var info = {_id:arg.path};
     // log.debug(mypath);
     return new Promise( (resolve,reject) => {
-      let pathFile = createFilePath(this.rootPath, arg.container, arg.file);
+      let pathFile = createFilePath(this.rootPath, arg.container, arg.path);
       fs.stat(pathFile, (err,stat) => {
-        if(err)reject(App.err.notFound("container not found"));
-        info.mtime = stat.mtime.getTime()/1000;
-        info.size = stat.size;
-        log.debug(info);
-        resolve(info);
+        if(err){
+          reject(App.err.notFound("file not found"))
+        }else{   
+          var info = createFileResponseObject(arg.container, undefined, arg.path, stat.mtime, stat.size, true);
+          // info.mtime = stat.mtime.getTime()/1000;
+          // info.size = stat.size;
+          // info.public = true; //De momento lo locales son siempre public
+          log.debug(info);
+          resolve(info);
+        }
       });
     });
   }
@@ -250,13 +285,15 @@ class A2sLocal{
             if(err){
               reject(new Error("file not found"));
             }else{
-              var info = {_id:arg.destFile};
+              // var info = {_id:arg.destFile};
               fs.stat(newFile, (err,stat) => {
                 if(err){
                   reject(App.err.notFound("container not found"));
                 }else{
-                  info.mtime = stat.mtime.getTime()/1000;
-                  info.size = stat.size;
+                  var info = createFileResponseObject(arg.container, undefined, arg.destFile, stat.mtime, stat.size, true);
+                  // info.mtime = stat.mtime.getTime()/1000;
+                  // info.size = stat.size;
+                  // info.public = true; //De momento lo locales son siempre public
                   log.debug(info);
                   resolve(info);
                 }
@@ -282,13 +319,15 @@ class A2sLocal{
             if(err){
               reject(new Error("file not found"));
             }else{
-              var info = {_id:arg.destFile};
+              // var info = {_id:arg.destFile};
               fs.stat(newFile, (err,stat) => {
                 if(err){
                   reject(App.err.notFound("container not found"));
                 }else{
-                  info.mtime = stat.mtime.getTime()/1000;
-                  info.size = stat.size;
+                  var info = createFileResponseObject(arg.container, undefined, arg.destFile, stat.mtime, stat.size, true);
+                  // info.mtime = stat.mtime.getTime()/1000;
+                  // info.size = stat.size;
+                  // info.public = true; //De momento lo locales son siempre public
                   log.debug(info);
                   resolve(info);
                 }
@@ -303,7 +342,7 @@ class A2sLocal{
   getFile(arg){
     log.debug("getFile");
     return new Promise((resolve, reject) => {
-      let pathFile = createFilePath(this.rootPath, arg.container, arg.file);
+      let pathFile = createFilePath(this.rootPath, arg.container, arg.path);
 
       log.debug(pathFile);
       var readStream = fs.createReadStream(pathFile);
@@ -323,11 +362,11 @@ class A2sLocal{
 
   deleteFile(arg) {
     log.debug("deleteFile");
-    var doc = {_id:arg.file};
-    log.debug(doc);
+    // var doc = {_id:arg.path};
+    // log.debug(doc);
     return new Promise((resolve,reject) => {
-      let containerPath = createFilePath(this.rootPath, arg.container, undefined) + "/";
-      var pathFile = containerPath+arg.file;
+      let containerPath = createFilePath(this.rootPath, arg.container, undefined);
+      var pathFile = createFilePath(containerPath,arg.path);
       log.debug(pathFile);
       fs.stat(pathFile, (err,stat) => {
         if(err){
@@ -336,11 +375,46 @@ class A2sLocal{
           fs.unlink(pathFile, err => {
             if(arg.clean) cleanPath(containerPath); //se limpia el 
             
-            if(err) reject(err);
-            else resolve(doc);
+            if(err){
+              reject(err);
+            }else {
+              var info = createFileResponseObject(arg.container, undefined, arg.path, stat.mtime, stat.size, true);
+              resolve(info)
+            };
           });
         }
       });
+    });
+  }
+
+
+   deleteFiles(arg) {
+    log.debug("deleteFiles");
+ 
+    return new Promise((resolve,reject) => {
+      let containerPath = createFilePath(this.rootPath, arg.container, undefined);
+      var pathDir = createFilePath(containerPath,arg.path);
+
+      // cleanPath(pathDir);
+      fs.readdir(pathDir, (err, files) => {
+        if (err){
+          reject(error)
+        }else{
+          files.forEach( file => {
+             fs.unlink(path.join(pathDir, file), err => {
+              if (err) throw error;
+            });
+          });
+          resolve();
+        }
+      });
+    });
+  }
+
+  makeFilePublic(arg) {
+    log.debug("makeFilePublic");
+    return new Promise((resolve,reject) => {
+      reject(new Error("Operation not allowed for local files")); // TODO: provisionalmente no se puede cambiar para local
     });
   }
 
@@ -428,21 +502,19 @@ function createFilePath(rootDir, subpath, fileName){
 }
 
 
-// var rootPath = null;
-// var _defaultPath = "./fs";
-// function A2sLocal(rootPath){
-//   this.rootPath = rootPath || _defaultPath;
-//   log.debug("A2sLocal: "+this.rootPath);
-//   var that = this;
-//   fs.access(this.rootPath, err => {
-//     if(err){
-//       fs.mkdirs(that.rootPath, err => {
-//         if(err)log.debug(err);
-//       });
-//     }
-//   });
-// }
+function createFileResponseObject(container, subPath, relativePath, mtime, size, public = true, isDir = false){
+  let baseUrl = createFilePath(rootUrl, container, subPath);
 
+  var info = {_id:relativePath};
+  info.type = isDir ? "dir": "file";
+  info.mtime = mtime.getTime()/1000;
+  info.size = size;
+  info.public = public; //De momento lo locales son siempre public
+  info.path = path.join(subPath || "",relativePath);
+  info.url = createFilePath(baseUrl,relativePath);
+
+  return info;
+}
 
 
 module.exports = A2sLocal;

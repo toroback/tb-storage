@@ -33,91 +33,82 @@ function setupRoutes(App){
   });
 
   //test Route
-  router.get('/', function(req, res) {
-      res.json({ message: 'A2Server Storage' });  
-  });
-
-  /**
-   * Devuelve la informacion de un archivo para un contenedor y archivo dados
-   * 
-   * @name Get file's info
-   * 
-   * @route  {GET} srv/storage/containers/:container/files/:file
-   * 
-   * @routeparam {String} container Nombre del contenedor del que obtener el archivo
-   * @routeparam {String} file Nombre completo del archivo que se quiere obtener (Ej. "myFile.png")
-   *
-   * @queryparam {String} [service] Servicio de almacenamiento en el que se encuentra el archivo. (Ej. "service=gcloud")
-   *
-   * @return {File} La información del archivo
-   * 
-   * @example
-   *   GET: http://localhost:4999/api/v1/srv/storage/containers/containerExample/files/file.jpg?service=gcloud
-   *    
-   *   RESPUESTA:
-   *   {
-   *      "file": {
-   *        "_id": "file.jpg",
-   *        "size": "131829",
-   *        "path": "https://www.googleapis.com/storage/v1/b/containerExample/o/file.jpg"
-   *      }
-   *    }
-   */
-  router.get("/containers/:container/files/:file",function(req, res, next){
-    var ctx = req._ctx;
-    ctx.payload.container = req.params.container;
-    ctx.payload.file = req.params.file;
-    ctx.payload.service = ctx.resource;
-    ctx.payload = processArgs(ctx.payload);
-
-    ctx.model = "storage";
-    ctx.method = 'getFileInfo';
-
-    getFSInstance(ctx.payload.service).do(ctx)
-      .then(resp => res.json(resp))
-      .catch(next);
-  }); //Probado local, gcloud, aws
+  // router.get('/', function(req, res) {
+  //     res.json({ message: 'A2Server Storage' });  
+  // });
 
 
   /**
-   * Devuelve una lista de los archivos que hay en el contenedor indicado. 
+   * Devuelve informacion
+   * Para indicar otro servicio distinto de local pasar el parametro "service". Si no se especifica, el almacenamiento será local. (Ej. "service=gcloud")
    * 
-   * @name Get container's files
+   * @name Get info
    *
-   * @route  {GET} srv/storage/containers/:container/files
+   * @route  {GET} srv/storage/
    *
-   * @queryparam {String} [service] Servicio de almacenamiento en el que se encuentran los archivos. (Ej. "service=gcloud")
-   *
-   * @routeparam {String} container Nombre del contenedor del que obtener los archivos
+   * @queryparam {String} [service] Servicio de almacenamiento del que cargar los contenedores. (Ej. "service=gcloud")
+   * @queryparam {String} [container] Contenedor(Ej. "container=mycontainer")
    * 
-   * @return [{File}] Un array con los archivos
+   * @queryparam {String} [reference] Referencia de la que obtener información. (Ej: "myReference")
+   * 
+   * @queryparam {String} [path] Path del que se quiere obtener la informacion, puede ser una subcarpeta (Ej: "subdir/") o una ruta a un archivo (Ej: "file.png" ó "subdir/file.png")
    *
-   * @example
-   *  GET: http://localhost:4999/api/v1/srv/storage/containers/containerExample/files?service=gcloud
-   *  RESPUESTA:
-   *  {
-   *     "files": [
-   *       {
-   *         "_id": "file.jpg",
-   *         "size": "131829",
-   *         "path": "https://www.googleapis.com/download/storage/v1/b/containerExample/o/file.jpg?generation=1499779049548839&alt=media"
-   *       }
-   *     ]
-   *  }
+   *
+   * @return [Object]  Dependiendo de la información solicitada devolvera información distinta. 
+   * 
+   * @example 
+   *   A continuacion una relacion entre los argumentos pasados y la información devuelta.
+   *   
+   *   Nota: Si la informacion se solicita con una referencia, la informacion devuelta será devuelta en formato de referencia
+   *  
+   *   - service                              -> Lista de los contenedores del servicio
+   *   - service, container                   -> Lista de los archivos del contenedor en el servicio indicado
+   *   - service, container, path(directorio) -> Lista de los archivos en el path dentro del contenedor para el servicio indicado 
+   *   - service, container, path(archivo)    -> Información del archivo en el path dentro del contenedor para el servicio indicado 
+   *
+   *   - reference                            -> Lista de los archivos en la referencia indicada
+   *   - reference, path(directorio)          -> Lista de los archivos en el subpath de la referencia indicada
+   *   - reference, path(archivo)             -> Información del archivo en el path dentro de la referencia indicada
+   *
+   *  
+   * GET:  http://localhost:4999/api/v1/srv/storage?service=gcloud
+   * GET:  http://localhost:4999/api/v1/srv/storage?service=gcloud&container=myContainer
+   * GET:  http://localhost:4999/api/v1/srv/storage?service=gcloud&container=myContainer&path=file.png
+   * GET:  http://localhost:4999/api/v1/srv/storage?service=gcloud&container=myContainer&path=subdir%2Ffile.png
+   * GET:  http://localhost:4999/api/v1/srv/storage?reference=myReference
+   * GET:  http://localhost:4999/api/v1/srv/storage?reference=myReference&path=file.png
+   * GET:  http://localhost:4999/api/v1/srv/storage?reference=myReference&path=subdir%2Ffile.png
    */
-  router.get("/containers/:container/files",function(req, res, next){
+  router.get("/",function(req, res, next){
     var ctx = req._ctx;
-    ctx.payload.container = req.params.container;
+    
     ctx.payload.service = ctx.resource;
+    ctx.payload.container = req.query.container;
+    if(req.query.path)
+      ctx.payload.path = decodeURI(req.query.path);
+
+    ctx.payload.reference = req.query.reference;
+
     ctx.payload = processArgs(ctx.payload);
 
+    if(ctx.payload.service && ctx.payload.container && ctx.payload.path){
+      if(ctx.payload.path.length == 0 || ctx.payload.path.endsWith('/')){
+        ctx.method = 'getFiles';
+      }else{
+        ctx.method = 'getFileInfo';
+      }
+    }else if(ctx.payload.service && ctx.payload.container){
+      ctx.method = 'getFiles';
+    }else{
+      ctx.method = 'getContainers';
+    }
     ctx.model = "storage";
-    ctx.method = 'getFiles';
 
     getFSInstance(ctx.payload.service).do(ctx)
-      .then(resp => res.json(resp))
+      .then(resp => res.status(200).json(resp))
       .catch(next);
   }); //Probado local, gcloud, aws
+
 
 
   /**
@@ -125,220 +116,74 @@ function setupRoutes(App){
    * 
    * @name Download file
    *
-   * @route  {GET} srv/storage/containers/:container/download/:file
+   * @route  {GET} srv/storage/download
    *
-   * @queryparam {String} [service]  Servicio de almacenamiento del que descargar el archivo. (Ej. "service=gcloud")
-   *
-   * @routeparam {String} container  Nombre del contenedor del que descargar el archivo
-   * @routeparam {String} file       Nombre completo del archivo que se quiere descargar (Ej. "myFile.png")
+   * @queryparam {String} [service]   Servicio de almacenamiento del que descargar el archivo. (Ej. "service=gcloud")
+   * @queryparam {String} [container] Nombre del contenedor del que descargar el archivo
+   * 
+   * @queryparam {String} [reference] Referencia de la que descargar el archivo. (Ej: "myReference")
+   * 
+   * @queryparam {String} [path] Path del archivo que se quiere descargar (Ej. "myFile.png", "subdir/file.png")
    * 
    * @return El archivo descargado
    *
    * @example
-   *  GET: http://localhost:4999/api/v1/srv/storage/containers/containerExample/download/file.jpg?service=gcloud
+   *  GET: http://localhost:4999/api/v1/srv/storage/download?service=gcloud&container=test-container&path=file.jpg
    */
-  router.get("/containers/:container/download/:file",function(req, res, next){
+  router.get("/download",function(req, res, next){
     
-    var file = req.params.file;
-    // console.log(file);
-
     var ctx = req._ctx;
-    ctx.payload.file = file;
-    ctx.payload.container = req.params.container;
-    ctx.payload.service = ctx.resource;
+    if(req.query.path)
+      ctx.payload.path = decodeURI(req.query.path);
 
-    ctx.model = "storage";
+    ctx.payload.service = ctx.resource;
+    ctx.payload.container = req.query.container;
+
+    ctx.payload.reference = req.query.reference;
+    // ctx.payload.arg = req.query.arg;
+
     ctx.payload.res = res;//TODO: (sergio) ver esto detenidamente
 
     ctx.payload = processArgs(ctx.payload);
 
     ctx.method = 'downloadFile';
-    // res.setHeader('Content-Type', 'image/png');
-    // Content-Disposition: attachment; filename="picture.png"
-    res.setHeader('Content-disposition', 'attachment; filename=' + file);
+    ctx.model = "storage";
+
+    res.setHeader('Content-disposition', 'attachment; filename=' + ctx.payload.path);
 
     getFSInstance(ctx.payload.service).do(ctx)
       .then(() => {
         log.debug("file downloado ok");
-        // res.status(200).json(resp); 
       })
       .catch(next);
 
   }); //Probado local, aws
 
 
-  /**
-   * Devuelve los contenedores existentes
-   * Para indicar otro servicio distinto de local pasar el parametro "service". Si no se especifica, el almacenamiento será local. (Ej. "service=gcloud")
-   * 
-   * @name Get containers
-   *
-   * @route  {GET} srv/storage/containers
-   *
-   * @queryparam {String} [service] Servicio de almacenamiento del que cargar los contenedores. (Ej. "service=gcloud")
-   * 
-   * @return [Container]  Un array con los contenedores
-   * 
-   * @example 
-   *   - http://localhost:4999/api/v1/srv/storage/containers  para los contenedores locales
-   *   - http://localhost:4999/api/v1/srv/storage/containers?service=gcloud  para los contenedores de gcloud
-   */
-  router.get("/containers",function(req, res, next){
-    var ctx = req._ctx;
-    ctx.payload.service = ctx.resource;
-    ctx.method = 'getContainers';
-    ctx.model = "storage";
-
-    getFSInstance(ctx.payload.service).do(ctx)
-      .then(resp => res.status(200).json(resp))
-      .catch(next);
-  }); //Probado local, gcloud, aws
 
 
-  /**
-   * Devuelve el contenedor para el nombre especificado
-   * Para indicar otro servicio distinto de local pasar el parametro "service". Si no se especifica, el almacenamiento será local. (Ej. "service=gcloud")
-   * 
-   * @name Get container
-   *
-   * @route  {GET} srv/storage/containers/:container
-   *
-   * @queryparam {String} [service] Servicio de almacenamiento del que cargar el contenedor. (Ej. "service=gcloud")*
-   *
-   * @routeparam {String} container  Nombre del contenedor que se quiere obtener  
-   * 
-   * @return {Container}  El contenedor
-   * 
-   * @example 
-   *   GET: http://localhost:4999/api/v1/srv/storage/containers/containerExample
-   *   
-   *   RESPUESTA:
-   *   {
-   *     "container": {
-   *       "_id": "containerExample",
-   *       "path": "https://www.googleapis.com/storage/v1/b/containerExample"
-   *     }
-   *   }  
-   */
-  router.get("/containers/:container",function(req, res, next){
-    var ctx = req._ctx;
-    ctx.payload.name = req.params.container;
-    ctx.payload.service = ctx.resource;
-    ctx.payload = processArgs(ctx.payload);
-
-    ctx.method = 'getContainerInfo';
-    ctx.model = "storage";
-
-    getFSInstance(ctx.payload.service).do(ctx)
-      .then(resp => res.status(200).json(resp))
-      .catch(next);
-  }); //Probado local, gcloud, aws
-
-
-  /**
-   * Crea un contener con los datos de la petición. 
-   * Para indicar otro servicio distinto de local pasar el parametro "service". Si no se especifica, el almacenamiento será local. (Ej. "service=gcloud")
-   *
-   * @name Create container
-   *
-   * @route  {POST} srv/storage/containers
-   *
-   * @queryparam  {String}  [service] Servicio de almacenamiento en el que crear el contedor. (Ej. "service=gcloud")
-   *
-   * @bodyparam   {String}  name      Nombre del contenedor que se va a crear
-   * @bodyparam   {String}  public    Flag que indica si el contenedor será público
-   * 
-   * @return {Container}  El contenedor creado
-   *  
-   * @example 
-   * POST:  http://localhost:4999/api/v1/srv/storage/containers?service=gcloud
-   * DATOS: 
-   * { 
-   *   "name": "containerExample",
-   *   "public" : true
-   * }
-   * 
-   *
-   * RESPUESTA:
-   * {
-   *   "container": {
-   *     "_id": "containerExample",
-   *     "path": "https://www.googleapis.com/storage/v1/b/containerExample"
-   *   }
-   * }  
-   */
-  router.post("/containers",function(req, res, next){
-    var ctx = req._ctx;
-    ctx.payload.service = ctx.resource;
-    ctx.model = "storage";
-    ctx.method = 'createContainer';
-
-    getFSInstance(ctx.payload.service).do(ctx)
-      .then(resp => res.status(200).json(resp))
-      .catch(next);
-  }); //Probado local, gcloud, aws
-
-
-  /**
-   * Deletes a container with a given name
-   * Para indicar otro servicio distinto de local pasar el parametro "service". Si no se especifica, el almacenamiento será local. (Ej. "service=gcloud")
-   *
-   * @name Delete container
-   *
-   * @route  {DELETE} srv/storage/containers/:container
-   *
-   * @queryparam {String} [service] Servicio de almacenamiento del que eliminar el contenedor. (Ej. "service=gcloud")
-   *
-   * @routeparam {String} container  Nombre del contenedor que se quiere eliminar
-   * 
-   * @return {Container} The deleted container
-   *
-   * @example
-   *  
-   * DELETE: http://localhost:4999/api/v1/srv/storage/containers/containerExample?service=gcloud
-   *
-   * RESPUESTA:
-   * {
-   *   "container": {
-   *     "_id": "containerExample"
-   *   }
-   * }
-   */
-  router.delete('/containers/:container', function(req, res, next) { 
-    var ctx = req._ctx;
-    ctx.payload.name = req.params.container;
-    ctx.payload.service = ctx.resource;
-    ctx.payload = processArgs(ctx.payload);
-
-    ctx.model = "storage";
-    ctx.method = 'deleteContainer';
-
-    getFSInstance(ctx.payload.service).do(ctx)
-      .then(resp => res.status(200).json(resp))
-      .catch(next);
-  }); //Probado local, gcloud, aws
-
-
-  /**
+    /**
    * Sube un archivo al contenedor especificado. Post en formato multipart
    * Para indicar otro servicio distinto de local pasar el parametro "service". Si no se especifica, el almacenamiento será local. (Ej. "service=gcloud")
    *
    * @name Upload file
    *
-   * @route  {POST} srv/storage/containers/:container/upload
-   *
+   * @route  {POST} srv/storage/upload
+   * 
    * @queryparam {String} [service]   Servicio de almacenamiento al que subir el archivo. (Ej. "service=gcloud")
+   * @queryparam {String} [container] Nombre del contenedor al que subir el archivo
+   * 
+   * @queryparam {String} [reference] Referencia a la que subir el archivo. (Ej: "myReference")
    *
-   * @routeparam {String} container   Nombre del contenedor al que subir el archivo
+   * @queryparam {String} [public]    "true" Para indicar que el archivo será público. Cualquier otro valor será tomado como no public.
    * 
    * @bodyparam  {File}   fileUpload  Archivo que se va a subir
    * @bodyparam  {String} path        Path destino del archivo incluyendo el nombre y extension. Ejemplos: "filename.png", "subdir/filename.png"
-   * @bodyparam  {String} public      "true" Para indicar que el archivo será público. Cualquier otro valor será tomado como no public.
    * 
    * @return {Object}  Informacion del archivo subido 
    *
    * @example: 
-   *   UPLOAD: http://localhost:4999/api/v1/srv/storage/containers/containerExample/upload?service=gcloud
+   *   UPLOAD: http://localhost:4524/api/v1/srv/storage/upload?service=gcloud&container=test-container&public=true
    *   DATOS multipart:
    *        - "path" : "file.png"
    *        - "fileUpload": El archivo a subir
@@ -346,27 +191,14 @@ function setupRoutes(App){
    *   RESPUESTA: 
    *   {
    *     "file": {
-   *       "_id": "file.png",
-   *       "size": "131829",
-   *       "path": "https://www.googleapis.com/download/storage/v1/b/containerExample/o/file.png?generation=1499774991897264&alt=media"
+   *       "path": "file.png",
+   *       "service": "gcloud",
+   *       "container": "test-container",
+   *       "public": true,
+   *       "url": "https://www.googleapis.com/download/storage/v1/b/test-container/o/file.png?generation=1504095147348420&alt=media"
    *     }
    *   }
    *
-   *   ----------------------------------------
-   *
-   *  UPLOAD: http://localhost:4999/api/v1/srv/storage/containers/containerExample/upload?service=gcloud
-   *   DATOS multipart:
-   *        - "path" : "subdir/file.png"
-   *        - "fileUpload": El archivo a subir
-   *   
-   *   RESPUESTA: 
-   *   {
-   *     "file": {
-   *       "_id": "subdir/file.png",
-   *       "size": "131829",
-   *       "path": "https://www.googleapis.com/download/storage/v1/b/containerExample/o/subdir%2Ffile.png?generation=1499774991897264&alt=media"
-   *     }
-   *   }
    *          
    */
   router.post("/upload",upload.single('fileUpload'),function(req, res, next){
@@ -375,17 +207,23 @@ function setupRoutes(App){
     log.debug(req.body.path);
 
     var ctx = req._ctx;
+    ctx.payload.service = ctx.resource;
     ctx.payload.container = req.query.container;
-    ctx.payload.public = req.query.public && req.query.public == 'true';
+
     ctx.payload.reference = req.query.reference;
     ctx.payload.arg = req.query.arg;
-    ctx.payload.service = ctx.resource;
+
+    ctx.payload.public = req.query.public && req.query.public == 'true';
+    
+    if(ctx.payload.reference && ctx.payload.reference == 'temporal'){
+      ctx.payload.arg = createRandomString(8);
+    }
 
     if(req.file)
       ctx.payload.file = req.file;
     ctx.payload.path = req.body.path;
    
-   ctx.payload = processArgs(ctx.payload);
+    ctx.payload = processArgs(ctx.payload);
     // ctx.payload.body = req.body;
     log.debug(ctx.payload);
     ctx.model = "storage";
@@ -396,69 +234,176 @@ function setupRoutes(App){
       .catch(next);
   });  //Probado local, gcloud, aws
 
-  // router.post("/containers/:container/upload",upload.single('fileUpload'),function(req, res, next){
-  //   log.trace("entra en upload file");
-  //   log.debug(req.file);
-  //   log.debug(req.body.path);
 
-  //   var ctx = req._ctx;
-  //   ctx.payload.container = req.params.container;
-  //   if(req.file)
-  //     ctx.payload.file = req.file;
-  //   ctx.payload.path = req.body.path;
-  //   ctx.payload.public = req.body.public && req.body.public == 'true';
-  //   // ctx.payload.body = req.body;
-  //   log.debug(ctx.payload);
-  //   ctx.model = "storage";
-  //   ctx.method = 'uploadFile';
-    
-  //   getFSInstance(ctx.resource).do(ctx)
-  //   .then(resp => res.status(200).json(resp))
-  //     .catch(next);
-  // });  //Probado local, gcloud, aws
+
 
 
   /**
-   * Elimina un archivo ya subido del contenedor indicado
+   * Elimina un contenedor o archivos dependiendo de los parámetros pasados
    * Para indicar otro servicio distinto de local pasar el parametro "service". Si no se especifica, el almacenamiento será local. (Ej. "service=gcloud")
    *
-   * @name Delete file
+   * @name Delete info
    *
-   * @route  {DELETE} srv/storage/containers/:container/files/:file
+   * @route  {DELETE} srv/storage/
    *
-   * @queryparam {String} [service] Servicio de almacenamiento del que eliminar el archivo. (Ej. "service=gcloud")
-   *
-   * @routeparam {String} container   Nombre del contenedor del que eliminar el archivo
-   * @routeparam {String} file        Nombre del archivo a eliminar
+   * @queryparam {String} [service] Servicio de almacenamiento del que eliminar el contenedor. (Ej. "service=gcloud")
+   * @queryparam {String} [container] Nombre del contenedor que se quiere eliminar (Ej. "container=mycontainer")
    * 
-   * @return {Object} El archivo eliminado
+   * @queryparam {String} [reference] Referencia de la que eliminar información. (Ej: "myReference")
+   * 
+   * @queryparam {String} [path] Path del que se quiere eliminar la informacion, puede ser una subcarpeta (Ej: "subdir/") o una ruta a un archivo (Ej: "file.png" ó "subdir/file.png")
+   *
+   * @queryparam {String} [force] Flag para forzar la eliminación de un contenedor aunque tenga archivos
+   * 
+   * @return [Object]  Dependiendo de la información solicitada devolvera información distinta. 
+   * 
    *
    * @example
-   *   DELETE: http://localhost:4999/api/v1/srv/storage/containers/containerExample/files/subdir%2Ffile.png
    *
-   *   RESPUESTA: 
-   *    {
-   *      "file": {
-   *        "_id": "subdir/file.png"
-   *      }
-   *    }
+   *   A continuacion una relacion entre los argumentos pasados y la informacion que se elimina.
+   *   
+   *   Nota: Si la informacion se solicita con una referencia, la informacion devuelta será devuelta en formato de referencia
+   *  
+   *   - service, container                   -> Elimina el contenedor en el servicio indicado
+   *   - service, container, path(directorio) -> Elimina los archivos en el path dentro del contenedor para el servicio indicado 
+   *   - service, container, path(archivo)    -> Elimina el archivo en el path dentro del contenedor para el servicio indicado 
+   *
+   *   - reference                            -> Elimina los archivos en la referencia indicada
+   *   - reference, path(directorio)          -> Elimina los archivos en el subpath de la referencia indicada
+   *   - reference, path(archivo)             -> Elimina el archivo en el path dentro de la referencia indicada
+   *
+   *  
+   *  DELETE: http://localhost:4999/api/v1/srv/storage?service=gcloud
+   *  DELETE: http://localhost:4999/api/v1/srv/storage?service=gcloud&container=myContainer
+   *  DELETE: http://localhost:4999/api/v1/srv/storage?service=gcloud&container=myContainer&path=file.png
+   *  DELETE: http://localhost:4999/api/v1/srv/storage?service=gcloud&container=myContainer&path=subdir%2Ffile.png
+   *  DELETE: http://localhost:4999/api/v1/srv/storage?reference=myReference
+   *  DELETE: http://localhost:4999/api/v1/srv/storage?reference=myReference&path=file.png
+   *  DELETE: http://localhost:4999/api/v1/srv/storage?reference=myReference&path=subdir%2Ffile.png
    */
-  router.delete('/containers/:container/files/:file', function(req, res, next) {
+  router.delete('/', function(req, res, next) { 
+    let invalidArgs = false;
     var ctx = req._ctx;
-    ctx.payload.container = req.params.container;
-    ctx.payload.file = req.params.file;
+    // ctx.payload.name = req.params.container;
     ctx.payload.service = ctx.resource;
+    ctx.payload.container = req.query.container;
+    if(req.query.path)
+      ctx.payload.path = decodeURI(req.query.path);
+
+    ctx.payload.reference = req.query.reference;
+
+    ctx.payload.force = req.query.force;
+    // ctx.payload.arg = req.query.arg;
+
     ctx.payload = processArgs(ctx.payload);
 
+    if(ctx.payload.service && ctx.payload.container && ctx.payload.path){
+      if(ctx.payload.path.length == 0 || ctx.payload.path.endsWith('/')){
+        ctx.method = 'deleteFiles';
+      }else{
+        ctx.method = 'deleteFile';
+      }
+    }else if(ctx.payload.service && ctx.payload.container){
+      ctx.method = 'deleteContainer';
+    }else{
+      invalidArgs = true;
+    }
+
     ctx.model = "storage";
-    ctx.method = 'deleteFile';
+  
+    if(invalidArgs){
+      next(App.err.badData("A service and container or a reference must be specified"));
+    }else{
+      getFSInstance(ctx.payload.service).do(ctx)
+        .then(resp => res.status(200).json(resp))
+        .catch(next);
+    }
+  }); //Probado local, gcloud, aws
+
+
+
+
+  /**
+   * Crea un contener con los datos de la petición. 
+   * Para indicar otro servicio distinto de local pasar el parametro "service". Si no se especifica, el almacenamiento será local. (Ej. "service=gcloud")
+   *
+   * @name Create container
+   *
+   * @route  {POST} srv/storage
+   *
+   * @queryparam  {String}  [service] Servicio de almacenamiento en el que crear el contedor. (Ej. "service=gcloud")
+   *
+   * @queryparam   {String}  container Nombre del contenedor que se va a crear
+   * @queryparam   {String}  [public]    Flag que indica si el contenedor será público
+   * 
+   * @return {Container}  El contenedor creado
+   *  
+   * @example 
+   * POST:  http://localhost:4999/api/v1/srv/storage?service=gcloud&container=my-container
+   *
+   * RESPUESTA:
+   * {
+   *   "container": {
+   *     "_id": "containerExample",
+   *     "path": "https://www.googleapis.com/storage/v1/b/containerExample"
+   *   }
+   * }  
+   */
+  router.post("/",function(req, res, next){
+    var ctx = req._ctx;
+    ctx.payload.service = ctx.resource;
+    ctx.payload.container = req.query.container;
+
+    ctx.model = "storage";
+    ctx.method = 'createContainer';
+
     getFSInstance(ctx.payload.service).do(ctx)
       .then(resp => res.status(200).json(resp))
       .catch(next);
   }); //Probado local, gcloud, aws
 
+
+  /**
+   * Hace public o privado un archivo
+   *
+   * @name Make public
+   * @queryparam {String}  [service] Servicio de almacenamiento en el que se encuentra el archivo. (Ej. "service=gcloud")
+   * @queryparam {String}  [container] Nombre del contenedor en el que se encuentra el archivo
+   * 
+   * @queryparam {String}  [reference] Referencia en la que se encuentra el archivo (Ej: "myReference")
+   * 
+   * @queryparam {String}  [path] Path en el que se encuentra el archivo, puede ser una subcarpeta (Ej: "subdir/") o una ruta a un archivo (Ej: "file.png" ó "subdir/file.png")
+   * @queryparam {String}  [public]    Flag que indica si el contenedor será público o privado. "true" Para indicar que el archivo será público. Cualquier otro valor será tomado como no public.
+   * 
+   * @return {[type]}           [description]
+   */
+  router.post("/public",function(req, res, next){
+    var ctx = req._ctx;
+    // ctx.payload.name = req.params.container;
+    ctx.payload.service = ctx.resource;
+    ctx.payload.container = req.query.container;
+    if(req.query.path)
+      ctx.payload.path = decodeURI(req.query.path);
+
+    ctx.payload.reference = req.query.reference;
+
+    ctx.payload.public = req.query.public;
+    // ctx.payload.arg = req.query.arg;
+
+    ctx.payload = processArgs(ctx.payload);
+
+    ctx.model = "storage";
+    ctx.method = 'makeFilePublic';
+
+    getFSInstance(ctx.payload.service).do(ctx)
+      .then(resp => res.status(200).json(resp))
+      .catch(next);
+  }); //Probado local, gcloud, aws
+
+
   App.app.use(`${App.baseRoute}/srv/storage`, router);
 }
+
 
 function processArgs(arg){
   let newArgs = Object.assign({},arg);
@@ -468,14 +413,10 @@ function processArgs(arg){
       delete newArgs.service;
       delete newArgs.container;
 
-      if(newArgs.reference){
-        let value = newArgs.reference == 'temporal' ? createRandomString(8) : newArgs.arg;
-        if(value){
-          newArgs.path = path.normalize(value + "/" + newArgs.path);
-        }
+      if(newArgs.reference && newArgs.arg){
+        newArgs.path = path.join(newArgs.arg,newArgs.path);
       }
-      // console.log("storageReferences", storageReferences);
-      // let data = storageReferences[newArgs.reference];
+
       let data = Storage.toServiceObject({reference: newArgs.reference, path: newArgs.path})
       if(data){
         newArgs.service = data.service;
@@ -490,6 +431,7 @@ function processArgs(arg){
   console.log("processed args", newArgs);
   return newArgs;
 }
+
 
 function createRandomString(length){
   var randomstring = require("randomstring");
