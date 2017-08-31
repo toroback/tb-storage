@@ -13,13 +13,13 @@ Para utilizar almacenamiento local en el servidor no es necesario configurar nin
 
 La configuracion de cualquier servicio se realizar en el archivo config.json que se encuentra en la carpeta "app".
 
- - Configuración de GCloud:
+- Configuración de GCloud:
 
-  * Desde a2server.a2system.net:
+    * Desde a2server.a2system.net:
 
-    En la aplicación seleccionada acceder a la sección "Configuración" y luego a la pestaña "Almacenamiento".
+        En la aplicación seleccionada acceder a la sección "Configuración" y luego a la pestaña "Almacenamiento".
 
-    Una vez en la pestaña en la sección de Google Cloud añadir el archivo keyFile.json pulsando el botón "Selecciona Google Cloud key" e introduce el id de proyecto GCloud.
+        Una vez en la pestaña en la sección de Google Cloud añadir el archivo keyFile.json pulsando el botón "Selecciona Google Cloud key" e introduce el id de proyecto GCloud.
 
   * Configuracion manual 
 
@@ -109,7 +109,7 @@ Para utilizar los servicios de almacenamiento se puede realizar de dos maneras:
 
 ### - **Llamadas internas**.
 
-  Para realizar las llamadas internas se utiliza el objeto App.FileStorage. 
+  Para realizar las llamadas internas se utiliza el objeto App.Storage. 
 
   Ejemplo:
 
@@ -124,7 +124,7 @@ Para utilizar los servicios de almacenamiento se puede realizar de dos maneras:
   })
 
   //ejemplo de almacenamiento local
-  var Storage = new App.FileStorage("local",__dirname+"/../../log/");
+  var Storage = new App.Storage("local");
     Storage.downloadFile({file:"test.log",res:res}).then(function(resp){
   }).catch(next);
 
@@ -328,4 +328,23 @@ Para utilizar los servicios de almacenamiento se puede realizar de dos maneras:
     GET: https://a2server.a2system.net:1234/api/v1/srv/storage/download?service=gcloud&container=containerExample&path=file.png
            
     
+- Obtener un access token:
+    
+    Realizar una peticion GET a https://[domain]:[port]/api/v[apiVersion]/srv/storage/get-token?service=< service >&mintime=< mintime >
+    
+    Parámetros:
+    * "service" : Servicio par el que pedir el token
+    * "mintime": Duracion minima que debe tener el token. Como máximo el token puede ser de una hora.
 
+    Ejemplo: 
+      
+    GET: https://a2server.a2system.net:1234/api/v1/srv/storage/get-token?service=gcloud&mintime=500
+    
+    RESPUESTA: 
+    
+    ```
+    {
+        "token": "xxXX.Elq4BMJxXxX-GcGC34ji8HevvXxxx6EQ5XZzDX56aN1oXXXXsvsTP7SmHgxJ-RogPzWjxxXplspMwMSyXXXXXgZvkozPZXgv5Fu5HxxxwBC74g4bH2JeK_7xXM",
+        "expires_at": 1504172051000
+    }
+    ```

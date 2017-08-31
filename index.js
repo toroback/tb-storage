@@ -91,24 +91,27 @@ class Storage{
     return A2sLocal.getLocalPath(App, container, subPath);
   }
 
-  // static referenceFromService(arg){
-  //   let foundRef;
-  //   let objectKeys = Object.keys(storageReferences);
-  //   for (var i = 0; i < objectKeys.length; i++) {
-  //     let key = objectKeys[i];
-  //     let ref = storageReferences[key];
-  //     if(ref.service === arg.service && ref.container === arg.container && ref.pathPrefix === arg.pathPrefix){
-  //       console.log("found");
-  //       foundRef = key;
-  //       break;
-  //     }
-  //   }
-  //   return foundRef;
-  // }
+  static genToken(service, minTime = 1800, credentials){  // minTime en segundos
+    if (!App)
+      throw new Error('getToken: setup() needs to be called first');
 
-  // static toService(key){
-  //   return storageReferences[key];
-  // }
+    return new Promise( (resolve, reject) => {
+      if(!service){
+        reject(App.err.badData('You must provide a service'));
+      }else{
+        if (service == 'gcloud') {
+          var a2sGcloud = require(servicesLocation+"/storage-gcloud.js");
+          a2sGcloud.genToken(App, credentials || App.storageOptions.gcloud, minTime)
+            .then(resp =>{
+              resolve(resp);
+            })
+            .catch(reject);
+        } else {
+          reject(new Error('Service not available yet'));
+        }
+      }
+    });
+  }
 
   /**
    * Metodo que permite llamar a cualquier otro metodo del modulo comprobando con aterioridad si el usuario tiene permisos para acceder a este.

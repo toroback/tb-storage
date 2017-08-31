@@ -8,6 +8,7 @@ let log;
 // var appDir = path.dirname(require.main.filename);
 
 let keyFilePath;// = appDir+"/../cert/";
+let gtoken;
 
 class A2sGcloud{
   constructor(_app, options){
@@ -20,7 +21,7 @@ class A2sGcloud{
     log.debug(options);
     this.gcs = gcloud.storage({
       projectId: options.projectId,
-      keyFilename: keyFilePath+options.keyFile.cert
+      keyFilename: path.join(keyFilePath,options.keyFile.cert)
     });
   }
 
@@ -281,6 +282,37 @@ class A2sGcloud{
     });
   }
 
+  static genToken(_app, credentials, minTime){
+    return new Promise((resolve, reject) => {
+      if(!credentials){
+        throw new Error("Not gcloud credentias found.");
+      }
+
+      minTime = Math.min(minTime, 3600); //Maximo una hora
+      var now = (new Date()).getTime();
+      let prevToken = createTokenData(gtoken) 
+      let needToInit = !gtoken || (gtoken.token && gtoken.expires_at && ((now + (minTime * 1000)) >= gtoken.expires_at));
+      if(needToInit){
+        let GoogleToken = require('gtoken');
+        gtoken = GoogleToken({
+          keyFile: path.join(_app.certsPath, credentials.keyFile.cert),
+          scope: ['https://www.googleapis.com/auth/devstorage.read_only'] // or space-delimited string of scopes 
+        });
+      }
+      gtoken.getToken( (err, token) => {
+        if (err) {
+          if(prevToken){
+            resolve(prevToken);
+          }else{
+            reject(err);
+          }
+        } else {
+          resolve(createTokenData(gtoken));
+        }
+      });
+      
+    });     
+  }
 }
 
 
@@ -364,6 +396,16 @@ function createFileResponseObject(subPath, relativePath, size, url, public = und
 }
 
 
-
+function createTokenData(gtoken){
+  let tokenData;
+  if(gtoken){
+    tokenData = { };
+    tokenData.token = gtoken.token;
+    tokenData.expires_at = gtoken.expires_at;
+    // if(gtoken.raw_token)
+    //   tokenData.type = gtoken.raw_token.token_type;
+  }
+  return tokenData;
+}
 
 module.exports = A2sGcloud;

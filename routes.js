@@ -401,6 +401,42 @@ function setupRoutes(App){
   }); //Probado local, gcloud, aws
 
 
+  /**
+   * Obtiene un access token del servicio indicado
+   *
+   * @name Get token
+   *
+   * @route  {GET} srv/storage/get-token
+   *
+   * @queryparam  {String}  [service] Servicio de almacenamiento del que se quiere obtener el token (Ej. "service=gcloud")
+   * @queryparam  {String}  [minTime] Tiempo minimo de duracion del token en segundos. Como máximo puede ser una hora (3600 segundos).
+   * 
+   * @return {Container}  El contenedor creado
+   *  
+   * @example 
+   * GET:  http://localhost:4999/api/v1/srv/storage/get-token?service=gcloud&mintime=500
+   *
+   * RESPUESTA:
+   * {
+   *   "token": "xxXX.Elq4BMJxXxX-GcGC34ji8HevvXxxx6EQ5XZzDX56aN1oXXXXsvsTP7SmHgxJ-RogPzWjxxXplspMwMSyXXXXXgZvkozPZXgv5Fu5HxxxwBC74g4bH2JeK_7xXM",
+   *   "expires_at": 1504172051000
+   * }  
+   */
+  router.post("/get-token",function(req, res, next){
+    var ctx = req._ctx;
+
+    let service = ctx.resource;
+    let minTime = req.query.mintime;
+
+    App.Storage.genToken(service, minTime)
+      .then(resp => {
+        res.status(200).json(resp); 
+      })
+      .catch(err => {next(err)});
+  }); //Probado local, gcloud, aws
+
+
+
   App.app.use(`${App.baseRoute}/srv/storage`, router);
 }
 
