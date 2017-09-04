@@ -359,7 +359,7 @@ class Storage{
       
       this.getFsObject().makeFilePublic(arg)
         .then(doc => {
-          let obj = createFileForResponse(this.service, arg, doc.path, doc.url, doc.public);
+          let obj = createFileForResponse(this.service, arg, doc.path, doc.url, arg.public);
           resolve({file:obj});
         })
         .catch(reject); 

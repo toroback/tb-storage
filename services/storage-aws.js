@@ -103,7 +103,7 @@ class AWSStorage{
             if(err) reject(err);
             else{
               console.log('uploaded!!', data);
-              resolve(fileObject(this.awsS3, dest, arg.container, data.ContentLength));
+              resolve(fileObject(this.awsS3, dest, arg.container, data.ContentLength, arg.public));
 
             }
           });
@@ -150,7 +150,7 @@ class AWSStorage{
   makeFilePublic(arg) {
     log.debug("makeFilePublic");
     return new Promise((resolve,reject) => {
-      this.awsS3.putObjectAcl({Bucket: arg.container, Key: arg.path, ACL: 'public-read'}, (err, data) => {
+      this.awsS3.putObjectAcl({Bucket: arg.container, Key: arg.path, ACL: (arg.public ? 'public-read' : 'private')}, (err, data) => {
         if(err){
           reject(err); // an error occurred
         }else{
@@ -160,7 +160,7 @@ class AWSStorage{
             }else if(!data){
               reject(new Error("File not found"));
             }else{
-              resolve(fileObject(this.awsS3, arg.path, arg.container, data.ContentLength));
+              resolve(fileObject(this.awsS3, arg.path, arg.container, data.ContentLength, arg.public));
             }     
           });
         }     

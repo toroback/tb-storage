@@ -171,7 +171,8 @@ class A2sGcloud{
     return new Promise((resolve,reject) => {
       var bucket = this.gcs.bucket(arg.container);
       var file = bucket.file(arg.path);
-      file.makePublic((err, resp) => {
+
+      let callback = (err, resp) => {
         log.debug("RESP");
         log.debug(resp);
         file.getMetadata((err, metadata, apiResponse) => {
@@ -179,14 +180,22 @@ class A2sGcloud{
             reject(err);
           }else if(metadata){
             log.debug(metadata);
-            let obj = createFileResponseObject(undefined, metadata.name, metadata.size, metadata.mediaLink);
+
+            let obj = createFileResponseObject(undefined, metadata.name, metadata.size, metadata.mediaLink, arg.public);
             resolve(obj);
             // resolve({_id:metadata.name,size:metadata.size,path:metadata.selfLink})
           }else{
             reject(new Error("Metadata don't found"));
           }
         });
-      });
+      }
+
+      console.log("Making public", arg.public)
+      if(arg.public){
+        file.makePublic(callback);
+      }else{
+        file.makePrivate({strict: true},callback);
+      }
     });
   }
 
