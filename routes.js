@@ -422,7 +422,7 @@ function setupRoutes(App){
    *   "expires_at": 1504172051000
    * }  
    */
-  router.post("/get-token",function(req, res, next){
+  router.get("/get-token",function(req, res, next){
     var ctx = req._ctx;
 
     let service = ctx.resource;
@@ -445,7 +445,7 @@ function processArgs(arg){
   let newArgs = Object.assign({},arg);
   if(newArgs){
     if((!newArgs.service || !newArgs.container) && newArgs.reference){
-      console.log("processing reference");
+      log.trace("processing reference");
       delete newArgs.service;
       delete newArgs.container;
 
@@ -460,11 +460,11 @@ function processArgs(arg){
         newArgs.path = data.path;
       }
     }else{
-        console.log("processing service");
+      log.trace("processing service");
       delete newArgs.reference;
     }
   }
-  console.log("processed args", newArgs);
+  log.debug("processed args", newArgs);
   return newArgs;
 }
 

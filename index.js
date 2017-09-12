@@ -103,6 +103,9 @@ class Storage{
           var a2sGcloud = require(servicesLocation+"/storage-gcloud.js");
           a2sGcloud.genToken(App, credentials || App.storageOptions.gcloud, minTime)
             .then(resp =>{
+              if(resp.expires_at){
+                resp.expires_at = new Date(resp.expires_at);
+              }
               resolve(resp);
             })
             .catch(reject);
@@ -146,6 +149,7 @@ class Storage{
     return new Promise((resolve, reject) => {
       // arg = processArgs(arg);
       arg = normalizeArgs(arg);
+      checkContainer(arg);
       this.getFsObject().createContainer(arg)
         .then(doc => {
           resolve({container:doc});
@@ -165,6 +169,7 @@ class Storage{
     return new Promise((resolve, reject) => {
       // arg = processArgs(arg);
       arg = normalizeArgs(arg);
+       checkContainer(arg);
       this.getFsObject().getFileInfo(arg)
         .then(doc => {
           let obj = createFileForResponse(this.service, arg, doc.path, doc.url, doc.public);
@@ -200,6 +205,7 @@ class Storage{
     return new Promise((resolve, reject) => {
       // arg = processArgs(arg);
       arg = normalizeArgs(arg);
+      checkContainer(arg);
       this.getFsObject().getFiles(arg)
         .then(docs => {
           let objs = docs ? docs.map(doc => createFileForResponse(this.service, arg, doc.path, doc.url, doc.public)) : []
@@ -221,6 +227,8 @@ class Storage{
     return new Promise((resolve, reject) => {
       // arg = processArgs(arg);
       arg = normalizeArgs(arg);
+
+      checkContainer(arg);
       this.getFsObject().getFile(arg)
         .then(docs => resolve())
         .catch(reject); 
@@ -237,6 +245,7 @@ class Storage{
     return new Promise((resolve, reject) => {
       // arg = processArgs(arg);
       arg = normalizeArgs(arg);
+      checkContainer(arg);
       this.getFsObject().getContainerInfo(arg)
         .then(doc => {
           resolve({container:doc});
@@ -251,8 +260,9 @@ class Storage{
   */
   getContainers(arg){
     return new Promise((resolve, reject) => {
-      // arg = processArgs(arg);
       arg = normalizeArgs(arg);
+
+      checkContainer(arg);
       this.getFsObject().getContainers(arg)
         .then(docs => {
           resolve({containers:docs});
@@ -275,6 +285,15 @@ class Storage{
     return new Promise((resolve, reject) => {
       // arg = processArgs(arg);
       arg = normalizeArgs(arg);
+      
+      if(!arg.file)
+        throw new Error("You must provide a file to upload");
+
+       checkContainer(arg);
+
+      if(!arg.path)
+        throw new Error("You must provide a path");
+
       this.getFsObject().uploadFile(arg)
         .then(doc => {
           let obj = createFileForResponse(this.service, arg, doc.path, doc.url, doc.public);
@@ -291,20 +310,23 @@ class Storage{
           resolve({file:obj});
         })
         .catch(reject); 
+      
     });
   };
 
   /**
    * Elimina un contenedor
    * @function deleteContainer
-   * @param {arg} payload - Objeto payload que recibe el metodo
-   * @param {string} payload.container - nombre del contenedor que deseamos eliminar
+   * @param {arg} arg - Objeto payload que recibe el metodo
+   * @param {string} arg.container - nombre del contenedor que deseamos eliminar
    * @param  {Object} arg.force  Flag para indicar si la eliminación es forzada
   */
   deleteContainer(arg){
     return new Promise((resolve, reject) => {
       arg = normalizeArgs(arg);
-      // arg = processArgs(arg);
+
+       checkContainer(arg);
+
       this.getFsObject().deleteContainer(arg)
         .then(doc => {
           resolve({container:doc});
@@ -316,14 +338,16 @@ class Storage{
   /**
    * Elimina un archivo
    * @function deleteFile
-   * @param {ctx} payload - Objeto payload que recibe el metodo
-   * @param {string} payload.container - nombre del contenedor donde se encuentra el archivo
-   * @param {string} payload.file - nombre del archivo a eliminar
+   * @param {ctx} arg - Objeto payload que recibe el metodo
+   * @param {string} arg.container - nombre del contenedor donde se encuentra el archivo
+   * @param {string} arg.file - nombre del archivo a eliminar
   */
   deleteFile(arg){
     return new Promise((resolve, reject) => {
       arg = normalizeArgs(arg);
-      // arg = processArgs(arg);
+      
+      checkContainer(arg);
+
       this.getFsObject().deleteFile(arg)
         .then(doc => {
           let obj = createFileForResponse(this.service, arg, doc.path, undefined, doc.public); //cuando se elimina no devuelvo la url
@@ -344,6 +368,7 @@ class Storage{
     return new Promise((resolve, reject) => {
       arg = normalizeArgs(arg);
       // arg = processArgs(arg);
+      checkContainer(arg);
       this.getFsObject().deleteFiles(arg)
         .then(docs => {
           let objs = docs ? docs.map(doc => createFileForResponse(this.service, arg, doc.path, doc.url, doc.public)) : []
@@ -356,7 +381,7 @@ class Storage{
   makeFilePublic(arg){
     return new Promise((resolve, reject) => {
       arg = normalizeArgs(arg);
-      
+      checkContainer(arg);
       this.getFsObject().makeFilePublic(arg)
         .then(doc => {
           let obj = createFileForResponse(this.service, arg, doc.path, doc.url, arg.public);
@@ -404,6 +429,22 @@ function normalizeArgs(arg){
   }
   return newArgs;
 }
+
+function checkContainer(arg){
+  if(!arg.container)
+    throw new Error(arg.reference ? "Cannot find container for reference" : "You must provide a container or a reference");
+}
+// function checkFileArgs(arg){
+//   if(!arg.service || !arg.container){
+//     let err;
+//     if(arg.reference){
+//       err = new Error("Cannot find service or container for reference");
+//     }else{
+//       err = new Error("You must provide a service and a container or a reference");
+//     }
+//     throw err;
+//   }
+// }
 
 
 
