@@ -39,7 +39,7 @@ class A2sLocal{
   }
 
   static getLocalPath(app, container, subPath){
-    return path.normalize(app.basePath, "..", _defaultPath, container, subPath);
+    return path.join(app.basePath, "..", _defaultPath, container, subPath);
   }
 
   createContainer(arg) {

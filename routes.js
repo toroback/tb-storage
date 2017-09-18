@@ -428,14 +428,12 @@ function setupRoutes(App){
     let service = ctx.resource;
     let minTime = req.query.mintime;
 
-    App.Storage.genToken(service, minTime)
+    Storage.genToken(service, minTime)
       .then(resp => {
         res.status(200).json(resp); 
       })
       .catch(err => {next(err)});
   }); //Probado local, gcloud, aws
-
-
 
   App.app.use(`${App.baseRoute}/srv/storage`, router);
 }
