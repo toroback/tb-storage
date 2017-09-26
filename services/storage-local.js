@@ -25,8 +25,10 @@ class A2sLocal{
 
     rootUrl = App.serverOptions.host+":"+App.serverOptions.port+"/"+path.normalize(_defaultPath)+"/";
 
-    this.rootPath = App.basePath + "../"+_defaultPath;
-    this.options = options;
+    this.options = options || {};
+
+    this.rootPath = this.options.rootPath || (App.basePath + "../"+_defaultPath);
+    
     log.debug("A2sLocal: "+this.rootPath);
     var that = this;
     fs.access(this.rootPath, err => {

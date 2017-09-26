@@ -11,21 +11,21 @@ let storageReferences = {};
 
 class Storage{
 
-  constructor(service, credentials){
+  constructor(service, options){
     this.service = service || _defaultService;
     log.trace("servicio %s", this.service);
     switch(this.service){
       case 'local':
         var A2sLocal = require(servicesLocation+"/storage-local.js");
-        this.fsObject = new A2sLocal(App);
+        this.fsObject = new A2sLocal(App, options);
         break;
       case 'gcloud':
         var a2sGcloud = require(servicesLocation+"/storage-gcloud.js");
-        this.fsObject = new a2sGcloud(App, credentials || App.storageOptions.gcloud);
+        this.fsObject = new a2sGcloud(App, options || App.storageOptions.gcloud);
         break;
       case 'aws':
         var a2sAws = require(servicesLocation+"/storage-aws.js");
-        this.fsObject = new a2sAws(App, credentials || App.storageOptions.aws);
+        this.fsObject = new a2sAws(App, options || App.storageOptions.aws);
         break;
     }
   }
