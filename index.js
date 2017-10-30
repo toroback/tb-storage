@@ -142,13 +142,13 @@ class Storage{
    * Permite crear un contenedor de archivos
    * @function createContainer
    * @param {arg} payload - Objeto payload que recibe el metodo
-   * @param {Object} payload.container
-   * @param {string} payload.container._id - nombre del contenedor a crear
+   * @param {string} payload.container - nombre del contenedor a crear
+   * @param {string} payload.public - nombre del contenedor a crear
   */
   createContainer(arg) {
     return new Promise((resolve, reject) => {
       // arg = processArgs(arg);
-      arg = normalizeArgs(arg);
+      arg = normalizeArgs(this.service, arg);
       checkContainer(arg);
       this.getFsObject().createContainer(arg)
         .then(doc => {
@@ -168,7 +168,7 @@ class Storage{
   getFileInfo(arg){
     return new Promise((resolve, reject) => {
       // arg = processArgs(arg);
-      arg = normalizeArgs(arg);
+      arg = normalizeArgs(this.service, arg);
        checkContainer(arg);
       this.getFsObject().getFileInfo(arg)
         .then(doc => {
@@ -204,7 +204,7 @@ class Storage{
   getFiles(arg){
     return new Promise((resolve, reject) => {
       // arg = processArgs(arg);
-      arg = normalizeArgs(arg);
+      arg = normalizeArgs(this.service, arg);
       checkContainer(arg);
       this.getFsObject().getFiles(arg)
         .then(docs => {
@@ -226,7 +226,7 @@ class Storage{
   downloadFile(arg){
     return new Promise((resolve, reject) => {
       // arg = processArgs(arg);
-      arg = normalizeArgs(arg);
+      arg = normalizeArgs(this.service, arg);
 
       checkContainer(arg);
       this.getFsObject().getFile(arg)
@@ -244,7 +244,7 @@ class Storage{
   getContainerInfo(arg){
     return new Promise((resolve, reject) => {
       // arg = processArgs(arg);
-      arg = normalizeArgs(arg);
+      arg = normalizeArgs(this.service, arg);
       checkContainer(arg);
       this.getFsObject().getContainerInfo(arg)
         .then(doc => {
@@ -260,9 +260,8 @@ class Storage{
   */
   getContainers(arg){
     return new Promise((resolve, reject) => {
-      arg = normalizeArgs(arg);
+      arg = normalizeArgs(this.service, arg);
 
-      checkContainer(arg);
       this.getFsObject().getContainers(arg)
         .then(docs => {
           resolve({containers:docs});
@@ -277,14 +276,12 @@ class Storage{
    * @param {arg} payload - Objeto payload que recibe el metodo
    * @param {string} payload.container - nombre del contenedor sera guardado el archivo
    * @param {string} payload.path - nombre con el cual se guardará el archivo (formato test/test1/text.txt)
-   * @param {Object} payload.file - Objeto que representa al archivo que deseamos guardar
-   * @param {string} payload.file.path - path donde se encuentra de forma temporal el archivo
-   * @param {String} payload.url - Para almacenar un archivo alojado en una url, pasamos este campo en lugar de file.
+   * @param {File} payload.file - Objeto que representa al archivo que deseamos guardar
   */
   uploadFile(arg){
     return new Promise((resolve, reject) => {
       // arg = processArgs(arg);
-      arg = normalizeArgs(arg);
+      arg = normalizeArgs(this.service, arg);
       
       if(!arg.file)
         throw new Error("You must provide a file to upload");
@@ -319,11 +316,11 @@ class Storage{
    * @function deleteContainer
    * @param {arg} arg - Objeto payload que recibe el metodo
    * @param {string} arg.container - nombre del contenedor que deseamos eliminar
-   * @param  {Object} arg.force  Flag para indicar si la eliminación es forzada
+   * @param {Boolean} arg.force  Flag para indicar si la eliminación es forzada
   */
   deleteContainer(arg){
     return new Promise((resolve, reject) => {
-      arg = normalizeArgs(arg);
+      arg = normalizeArgs(this.service, arg);
 
        checkContainer(arg);
 
@@ -339,12 +336,12 @@ class Storage{
    * Elimina un archivo
    * @function deleteFile
    * @param {ctx} arg - Objeto payload que recibe el metodo
-   * @param {string} arg.container - nombre del contenedor donde se encuentra el archivo
-   * @param {string} arg.file - nombre del archivo a eliminar
+   * @param {string} arg.container - Nombre del contenedor donde se encuentra el archivo
+   * @param {string} arg.path - Path del archivo a eliminar
   */
   deleteFile(arg){
     return new Promise((resolve, reject) => {
-      arg = normalizeArgs(arg);
+      arg = normalizeArgs(this.service, arg);
       
       checkContainer(arg);
 
@@ -380,7 +377,7 @@ class Storage{
 
   makeFilePublic(arg){
     return new Promise((resolve, reject) => {
-      arg = normalizeArgs(arg);
+      arg = normalizeArgs(this.service, arg);
       checkContainer(arg);
       this.getFsObject().makeFilePublic(arg)
         .then(doc => {
@@ -416,10 +413,10 @@ function createFileForResponse(service, reqArgs, path, url, public){
  * @param  {[type]} arg [description]
  * @return {[type]}     [description]
  */
-function normalizeArgs(arg){
+function normalizeArgs(service, arg){
   let newArgs = Object.assign({},arg);
   if(newArgs.container){
-    if(newArgs.service == "aws"){ //para amazon se pasa el contenedor a minuscula
+    if(service == "aws"){ //para amazon se pasa el contenedor a minuscula
       newArgs.container = newArgs.container.toLowerCase();
     }
   }

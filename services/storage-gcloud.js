@@ -362,23 +362,6 @@ function copyData(savPath, srcPath) {
 //   });
 // }
 
-function cleanPath(pathToClean){
-  log.debug("entra en clean");
-  fs.readdir(pathToClean,(err,folders) => {
-    folders.forEach(folder => {
-      var localPath = path.normalize(pathToClean+"/"+folder);
-      var stat = fs.statSync(localPath);
-      if(stat.isDirectory()){
-        fs.readdir(localPath,(err,subFolders) => {
-          if(subFolders.length == 0)
-            fs.rmdir(localPath);
-          else
-            cleanPath(localPath);
-        });
-      }
-    });
-  });
-}
 
 // function newContainer(name, path, stat){
 //   return {_id:name, path:path, size:stat.size};

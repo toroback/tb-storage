@@ -1,4 +1,3 @@
-
 var fs = require('fs-extra');
 var recursive = require('recursive-readdir');
 var path = require('path');
@@ -375,14 +374,16 @@ class A2sLocal{
           reject(App.err.notFound("file not found"));
         }else{
           fs.unlink(pathFile, err => {
-            if(arg.clean) cleanPath(containerPath); //se limpia el 
-            
-            if(err){
-              reject(err);
-            }else {
-              var info = createFileResponseObject(arg.container, undefined, arg.path, stat.mtime, stat.size, true);
-              resolve(info)
-            };
+            cleanFromDirToDir(containerPath, path.parse(pathFile).dir)
+              .then(cleaned =>{
+                // if(arg.clean) cleanPath(containerPath); //se limpia el 
+                if(err){
+                  reject(err);
+                }else {
+                  var info = createFileResponseObject(arg.container, undefined, arg.path, stat.mtime, stat.size, true);
+                  resolve(info)
+                };
+              })
           });
         }
       });
@@ -403,10 +404,14 @@ class A2sLocal{
           reject(error)
         }else{
           files.forEach( file => {
-             fs.unlink(path.join(pathDir, file), err => {
-              if (err) throw error;
-            });
+             fs.unlinkSync(path.join(pathDir, file));
+
+            //  fs.unlink(path.join(pathDir, file), err => {
+            //   if (err) throw error;
+              
+            // });
           });
+          cleanFromDirToDir(containerPath, pathDir);
           resolve();
         }
       });
@@ -458,6 +463,34 @@ function cleanPath(path){
       }
     });
   });
+}
+
+/**
+ * Elimina la ruta entre containerPath y dirPath si los directorios estan vacíos completamente 
+ * @param  {String} startDir  Directorio a partir del que se quiere limpiar 
+ * @param  {String} endDir    Subdirectorio de startDir con el que forma la ruta que se quiere limpiar 
+ * @return {Promise}          Promesa que indica si se pudo limpiar o no la ruta
+ */
+function cleanFromDirToDir(startDir, endDir){
+  return new Promise((resolve, reject) =>{
+    //Se normalizan ambos paths para poder compararlos y saber si dirPath contiene a containerPath
+    let normContainerPath = path.normalize(startDir);
+    let normPath = path.normalize(endDir);
+    var exit = false;
+
+    //Mientras normPath sea subpath de normContainerPath, no sean el mismo, y este vacío eliminar las carpetas vacias
+    while(normPath.startsWith(normContainerPath) && normPath != normContainerPath && !exit){ 
+      log.debug("Cleaning path: "+ normPath);
+      let files = fs.readdirSync(normPath);
+      if (files.length == 0){
+          fs.rmdirSync(normPath);
+          normPath = path.normalize(normPath+"/..");
+      }else{
+          exit = true;
+      }
+    } 
+    resolve(normPath == normContainerPath);
+  })
 }
 
 // function newContainer(name, path, stat){
