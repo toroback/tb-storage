@@ -109,9 +109,11 @@ class A2sGcloud{
 
       bucket.upload(file,options,(err,f) => {
         if(!err){
-          if(arg.public)
+          if(arg.public){
             f.makePublic((err, resp) => {});
-
+          }else{
+            f.makePrivate({strict: true},(err, resp) => {});
+          }
           let obj = createFileResponseObject(undefined, f.metadata.name, f.metadata.size, f.metadata.mediaLink, arg.public);
           resolve(obj);
         }else{
@@ -133,12 +135,16 @@ class A2sGcloud{
       var bucket = this.gcs.bucket(container);
       bucket.getFiles(option, (err, files) => {
        if (!err) {
-          // buckets is an array of Bucket objects.
-          let respFiles = files.map(f =>{
-            return createFileResponseObject(undefined, f.metadata.name, f.metadata.size, f.metadata.mediaLink);
-            // return {_id:file.metadata.name,size:file.metadata.size,path:file.metadata.mediaLink};
-          })
-          resolve(respFiles);
+        
+          let promises = files.map(f =>{
+            return checkPublic(f)
+                     .then(isPublic => Promise.resolve(createFileResponseObject(undefined, f.metadata.name, f.metadata.size, f.metadata.mediaLink, isPublic)) )
+                     .catch(err => Promise.resolve(undefined));
+          });
+          
+          Promise.all(promises)
+            .then(filesObjects => resolve(filesObjects.filter(fileObject => fileObject != undefined)));
+          // resolve(respFiles);
         }else{
           reject(err);
         }
@@ -152,15 +158,16 @@ class A2sGcloud{
       var bucket = this.gcs.bucket(arg.container);
       var file = bucket.file(arg.path);
       file.getMetadata((err, metadata, apiResponse) => {
-        if(err){
-          reject(err);
-        }else if(metadata){
+        if(metadata){
           log.debug(metadata);
-           let obj = createFileResponseObject(undefined, metadata.name, metadata.size, metadata.mediaLink);
-           resolve(obj);
-          // resolve({_id:metadata.name,size:metadata.size,path:metadata.selfLink})
+          checkPublic(file)
+            .then(isPublic =>{
+              let obj = createFileResponseObject(undefined, metadata.name, metadata.size, metadata.mediaLink, isPublic);
+              resolve(obj);
+            })
+            .catch(reject);
         }else{
-          reject(new Error("Metadata don't found"));
+          reject(err ? err : new Error("Metadata don't found"));
         }
       });
     });
@@ -209,10 +216,14 @@ class A2sGcloud{
         if(err){
           reject(err);
         }else{
-          destinationFile.getMetadata((err, metadata, apiResponse) => {
-            if(err) reject(err);
-            else resolve(createFileResponseObject(undefined, metadata.name, metadata.size, metadata.mediaLink));
-          });
+          checkPublic(file)
+            .then(isPublic =>{
+              destinationFile.getMetadata((err, metadata, apiResponse) => {
+                if(err) reject(err);
+                else resolve(createFileResponseObject(undefined, metadata.name, metadata.size, metadata.mediaLink, isPublic));
+              });
+            })
+            .catch(reject);
         }
       });
     });
@@ -366,6 +377,15 @@ function copyData(savPath, srcPath) {
 // function newContainer(name, path, stat){
 //   return {_id:name, path:path, size:stat.size};
 // }
+
+
+function checkPublic(file){
+  return new Promise((resolve,reject)=>{
+    file.acl.get({entity:"allUsers"}, function(err, aclObject, apiResponse){
+      resolve(aclObject && aclObject.role == 'READER')
+    });
+  });
+}
 
 function checkName(name){
   log.debug("checkName");

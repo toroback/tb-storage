@@ -125,8 +125,18 @@ class AWSStorage{
       this.awsS3.listObjectsV2(params, (err, data) => {
         if(err) reject(err); // an error occurred
         else{
-          var respFiles = data.Contents.map(file => fileObject(this.awsS3, file.Key, container, file.Size));
-          resolve(respFiles);
+          let promises = data.Contents.map(file =>{
+            return checkPublic(this.awsS3, {Bucket: params.Bucket, Key: file.Key})
+                     .then(isPublic => Promise.resolve(fileObject(this.awsS3, file.Key, container, file.Size, isPublic)) )
+                     .catch(err => Promise.resolve(undefined));
+          });
+          
+          Promise.all(promises)
+            .then(filesObjects => resolve(filesObjects.filter(fileObject => fileObject != undefined)));
+
+
+          // var respFiles = data.Contents.map(file => fileObject(this.awsS3, file.Key, container, file.Size));
+          // resolve(respFiles);
         }    
       });
     });
@@ -135,14 +145,15 @@ class AWSStorage{
   getFileInfo(arg) {
     log.debug("getFileInfo");
     return new Promise((resolve,reject) => {
-      this.awsS3.headObject({Bucket: arg.container, Key: arg.path}, (err, data) => {
-        if(err){ 
-          reject(err); // an error occurred
-        }else if(!data){
-          reject(new Error("File not found"));
+      let params = {Bucket: arg.container, Key: arg.path};
+      this.awsS3.headObject(params, (err, data) => {
+        if(data){
+          checkPublic(this.awsS3, params)
+            .then(isPublic => resolve(fileObject(this.awsS3, arg.path, arg.container, data.ContentLength, isPublic)) )
+            .catch(reject);
         }else{
-          resolve(fileObject(this.awsS3, arg.path, arg.container, data.ContentLength));
-        }     
+          reject(err ? err : new Error("File not found"));
+        }
       });
     });
   }
@@ -234,7 +245,43 @@ class AWSStorage{
 
 }
 
+// { Grantee: 
+//    { Type: 'Group',
+//      URI: 'http://acs.amazonaws.com/groups/global/AllUsers' },
+//   Permission: 'READ' }
+//   
 
+/**
+ * Comprueba la privacidad de un objeto
+ * @param  {AWS} awsS3  
+ * @param  {Object} params Objeto que indica el Bucket y el Key del objeto
+ * @return {Promise<Boolean>}        Promesa que indica si es público o no
+ */
+function checkPublic(awsS3, params){
+  return new Promise((resolve,reject)=>{
+    if(params && params.Bucket && params.Key){
+      awsS3.getObjectAcl(params, (err, data) => {
+        if(data){
+          var isPublic = undefined;
+          data.Grants.forEach(grant => {
+            if (isPublic == undefined){
+              if(grant.Grantee && grant.Grantee.Type == 'Group' && grant.Grantee.URI == 'http://acs.amazonaws.com/groups/global/AllUsers'){
+                isPublic = grant.Permission == 'READ';
+              }
+            }
+          });
+          
+          resolve(isPublic ? isPublic : false);
+        }else{
+          log.error(err ? err: new Error("Unexpected error while checking ACL"));
+          resolve(false);
+        }
+      });
+    }else{
+      reject(new Error("File not specified"));
+    }
+  });
+}
 
   /**
    * Crea la url de un archivo
@@ -264,8 +311,8 @@ class AWSStorage{
    * @param  {Number} size   Tamaño del arhivo (Opcional)
    * @return {Object}        Un objeto con la información
    */
-  function fileObject(awsS3, name, bucket, size, public = undefined){
-    let obj = {_id: name, url: fileUrl(awsS3, bucket, name), path: name, public: public};
+  function fileObject(awsS3, name, bucket, size, isPublic = undefined){
+    let obj = {_id: name, url: fileUrl(awsS3, bucket, name), path: name, public: isPublic};
     if(size) obj.size = size;
     return obj;
   }
