@@ -12,6 +12,11 @@ let storage = new Storage( );
 
 let log;
 
+/**
+ * Rest API del módulo de almacenamiento, tb-storage.
+ * 
+ * @module tb-storage/routes
+ */
 function setupRoutes(App){
 
   log = App.log.child({module:'storageRoute'});
@@ -32,17 +37,12 @@ function setupRoutes(App){
     next();
   });
 
-  //test Route
-  // router.get('/', function(req, res) {
-  //     res.json({ message: 'A2Server Storage' });  
-  // });
-
 
   /**
    * Devuelve informacion
    * Para indicar otro servicio distinto de local pasar el parametro "service". Si no se especifica, el almacenamiento será local. (Ej. "service=gcloud")
    * 
-   * @name Get info
+   * @name Get file or container info
    *
    * @route  {GET} srv/storage/
    *
@@ -242,7 +242,7 @@ function setupRoutes(App){
    * Elimina un contenedor o archivos dependiendo de los parámetros pasados
    * Para indicar otro servicio distinto de local pasar el parametro "service". Si no se especifica, el almacenamiento será local. (Ej. "service=gcloud")
    *
-   * @name Delete info
+   * @name Delete file or container 
    *
    * @route  {DELETE} srv/storage/
    *
@@ -366,7 +366,10 @@ function setupRoutes(App){
   /**
    * Hace public o privado un archivo
    *
-   * @name Make public
+   * @name Make file public
+   * 
+   * @route  {POST} srv/storage/public
+   * 
    * @queryparam {String}  [service] Servicio de almacenamiento en el que se encuentra el archivo. (Ej. "service=gcloud")
    * @queryparam {String}  [container] Nombre del contenedor en el que se encuentra el archivo
    * 
@@ -375,7 +378,7 @@ function setupRoutes(App){
    * @queryparam {String}  [path] Path en el que se encuentra el archivo, puede ser una subcarpeta (Ej: "subdir/") o una ruta a un archivo (Ej: "file.png" ó "subdir/file.png")
    * @queryparam {String}  [public]    Flag que indica si el contenedor será público o privado. "true" Para indicar que el archivo será público. Cualquier otro valor será tomado como no public.
    * 
-   * @return {[type]}           [description]
+   * @return {Object}       Archivo al que se le cambio la privacidad
    */
   router.post("/public",function(req, res, next){
     var ctx = req._ctx;
@@ -438,7 +441,12 @@ function setupRoutes(App){
   App.app.use(`${App.baseRoute}/srv/storage`, router);
 }
 
-
+/**
+ * Procesa los argumentos de la peticion
+ * @private
+ * @param  {Object} arg Los argumentos a procesar
+ * @return {Object}     Los argumentos procesados
+ */
 function processArgs(arg){
   let newArgs = Object.assign({},arg);
   if(newArgs){
@@ -466,8 +474,13 @@ function processArgs(arg){
   return newArgs;
 }
 
-
-function createRandomString(length){
+/**
+ * Crea un string aleatoreo de longitud dada. 
+ * @private
+ * @param  {Number} [length] Longitud del string. Por defecto es 8
+ * @return {String}        El string generado
+ */
+function createRandomString(length = 8){
   var randomstring = require("randomstring");
   return randomstring.generate(length);
 }

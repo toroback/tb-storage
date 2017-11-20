@@ -5,12 +5,24 @@ var path = require('path');
 let App;
 let log;
 
-// var appDir = path.dirname(require.main.filename);
-
 let keyFilePath;// = appDir+"/../cert/";
 let gtoken;
 
+/**
+ * Servicio de almacenamiento de GCloud
+ * @private
+ * @memberOf module:tb-storage
+ */
 class A2sGcloud{
+
+  /**
+   * Crea una instancia del servicio de GCloud
+   * @param  {Object} _app                  Objeto App de la aplicación
+   * @param  {Object} options               Objeto con las credenciales para el modulo
+   * @param  {String} options.projectId     ProjectId de GCloud
+   * @param  {Object} options.keyFile       Objeto con información del keyFile de GCloud
+   * @param  {String} options.keyFile.cert  Path relativo a la carpeta "cert" del proyecto con la ubicación del keyFile de GCloud
+   */
   constructor(_app, options){
     App = _app;
     log = App.log.child({module:'gcloud-storage'});
@@ -25,6 +37,14 @@ class A2sGcloud{
     });
   }
 
+  /**
+   * Crea un contenedor de archivos
+   * @param {Object} arg           - Objeto payload que recibe el metodo
+   * @param {String} arg.container - Nombre del contenedor a crear
+   * @param {String} arg.public     - Indica si el contenedor será publico o no
+   * 
+   * @return {Promise<Object>} Promesa con la información del contenedor
+  */
   createContainer(arg) {
     log.debug("createContainer");
     log.debug(arg.container);
@@ -50,6 +70,13 @@ class A2sGcloud{
     });
   }
 
+  /**
+   * Obtiene información de un contenedor
+   * 
+   * @param {Object} arg            Objeto payload que recibe el metodo
+   * @param {string} arg.container  Nombre del contenedor
+   * @return {Promise<Object>}      Promesa con la información del contenedor.    
+  */
   getContainerInfo(arg) {
     log.debug("getContainerInfo");
     return new Promise((resolve,reject) => {
@@ -61,6 +88,14 @@ class A2sGcloud{
     });
   }
 
+  /**
+   * Elimina un contenedor
+   * 
+   * @param {Object} arg            - Objeto payload que recibe el metodo
+   * @param {String} arg.container  - nombre del contenedor que deseamos eliminar
+   * @param {Boolean} arg.force     - Flag para indicar si la eliminación es forzada
+   * @return {Promise<Object>}       Promesa con la información del contenedor.    
+  */
   deleteContainer(arg) {
     log.debug("deleteContainer");
     return new Promise((resolve,reject) => {
@@ -82,6 +117,10 @@ class A2sGcloud{
     });
   }
 
+  /**
+   * Obtiene todos los contenedores
+   * @return {Promise<Array>}  Promesa con los contenedores cargados
+  */
   getContainers() {
     log.debug("getContainers");
     return new Promise((resolve,reject) => {
@@ -99,6 +138,16 @@ class A2sGcloud{
     });
   }
 
+  /**
+   * Permite almacenar un archivo en el contenedor indicado
+   * 
+   * @param {arg}     arg             - Objeto payload que recibe el metodo
+   * @param {string}  arg.container   - nombre del contenedor sera guardado el archivo
+   * @param {string}  arg.path        - nombre con el cual se guardará el archivo (formato test/test1/text.txt)
+   * @param {File}    arg.file        - Objeto que representa al archivo que deseamos guardar
+   * @param {Boolean} arg.public      - Indica si el archivo será publico o no
+   * @return {Promise<Object>}       Promesa con la información del archivo.    
+  */
   uploadFile(arg) {
     return new Promise((resolve,reject) => {
       var file = arg.file.path;
@@ -114,7 +163,7 @@ class A2sGcloud{
           }else{
             f.makePrivate({strict: true},(err, resp) => {});
           }
-          let obj = createFileResponseObject(undefined, f.metadata.name, f.metadata.size, f.metadata.mediaLink, arg.public);
+          let obj = createFileResponseObject(f.metadata.name, f.metadata.size, f.metadata.mediaLink, arg.public);
           resolve(obj);
         }else{
           reject(err);
@@ -123,7 +172,14 @@ class A2sGcloud{
     });
   }
 
-
+  /**
+   * Obtiene todos los archivos de una ubicación
+   * 
+   * @param {Object} arg           - Objeto payload que recibe el metodo
+   * @param {String} arg.container - Nombre del contenedor donde se encuentra dicho archivo
+   * @param {String} arg.path      - Path del que se quiere obtener la informacion
+   * @return {Promise<Array>}     Devuelve una promesa al array con información sobre todos los archivos de la ubicacion indicada
+  */
   getFiles(arg){
     log.debug("getFiles");
     return new Promise((resolve,reject) => {
@@ -138,7 +194,7 @@ class A2sGcloud{
         
           let promises = files.map(f =>{
             return checkPublic(f)
-                     .then(isPublic => Promise.resolve(createFileResponseObject(undefined, f.metadata.name, f.metadata.size, f.metadata.mediaLink, isPublic)) )
+                     .then(isPublic => Promise.resolve(createFileResponseObject(f.metadata.name, f.metadata.size, f.metadata.mediaLink, isPublic)) )
                      .catch(err => Promise.resolve(undefined));
           });
           
@@ -152,6 +208,15 @@ class A2sGcloud{
     });
   }
 
+  /**
+   * Obteniene información sobre un archivo
+   * 
+   * @param {Object} arg - Objeto Payload que recibe el metodo
+   * @param {String} arg.container - Nombre del contenedor donde se encuentra dicho archivo
+   * @param {String} arg.path - Nombre del archivo
+   *
+   * @return {Promise<Object>} Promesa con la información del archivo
+  */
   getFileInfo(arg) {
     log.debug("getFileInfo");
     return new Promise((resolve,reject) => {
@@ -162,7 +227,7 @@ class A2sGcloud{
           log.debug(metadata);
           checkPublic(file)
             .then(isPublic =>{
-              let obj = createFileResponseObject(undefined, metadata.name, metadata.size, metadata.mediaLink, isPublic);
+              let obj = createFileResponseObject(metadata.name, metadata.size, metadata.mediaLink, isPublic);
               resolve(obj);
             })
             .catch(reject);
@@ -173,6 +238,14 @@ class A2sGcloud{
     });
   }
 
+  /**
+   * Cambia el estado de publico del archivo
+   * @param  {Object} arg            Objeto con la informacion necesaria
+   * @param  {String} arg.container  Nombre del contenedor del archivo
+   * @param  {String} arg.path       Path del archivo
+   * @param  {String} arg.public     Nuevo estado de público del archivo
+   * @return {Promise<Object>}       Promesa con la información del archivo.    
+  */
   makeFilePublic(arg) {
     log.debug("makeFilePublic");
     return new Promise((resolve,reject) => {
@@ -188,9 +261,9 @@ class A2sGcloud{
           }else if(metadata){
             log.debug(metadata);
 
-            let obj = createFileResponseObject(undefined, metadata.name, metadata.size, metadata.mediaLink, arg.public);
+            let obj = createFileResponseObject(metadata.name, metadata.size, metadata.mediaLink, arg.public);
             resolve(obj);
-            // resolve({_id:metadata.name,size:metadata.size,path:metadata.selfLink})
+          
           }else{
             reject(new Error("Metadata don't found"));
           }
@@ -206,6 +279,10 @@ class A2sGcloud{
     });
   }
 
+  /**
+   * Mueve un archivo de una ubicación a otra
+   * @private
+   */
   moveFile(arg) {
     log.debug("moveFile");
     return new Promise((resolve,reject) => {
@@ -220,7 +297,7 @@ class A2sGcloud{
             .then(isPublic =>{
               destinationFile.getMetadata((err, metadata, apiResponse) => {
                 if(err) reject(err);
-                else resolve(createFileResponseObject(undefined, metadata.name, metadata.size, metadata.mediaLink, isPublic));
+                else resolve(createFileResponseObject(metadata.name, metadata.size, metadata.mediaLink, isPublic));
               });
             })
             .catch(reject);
@@ -229,6 +306,10 @@ class A2sGcloud{
     });
   }
 
+  /**
+   * Copia un archivo de una ubicación a otra
+   * @private
+   */
   copyFile(arg) {
     log.debug("copyFile");
     return new Promise((resolve,reject) => {
@@ -241,13 +322,22 @@ class A2sGcloud{
         }else{
           destinationFile.getMetadata((err, metadata, apiResponse) => {
             if(err)reject(err);
-            else resolve(createFileResponseObject(undefined, metadata.name, metadata.size, metadata.mediaLink));
+            else resolve(createFileResponseObject(metadata.name, metadata.size, metadata.mediaLink));
           });
         }
       });
     });
   }
 
+  /**
+   * Permite obtener un archivo del servidor
+   * 
+   * @param {Object} arg                Objeto payload que recibe el metodo
+   * @param {String} arg.container      Nombre del contenedor donde se encuentra dicho archivo (opcional)
+   * @param {String} arg.path           Nombre del archivo que se desea descargar
+   * @param {Stream.Writable} arg.res   Flujo por donde se devuelve el fichero
+   * @return {Promise} Una promesa
+  */
   getFile(arg){
     log.debug("getFile");
     return new Promise((resolve, reject) => {
@@ -268,6 +358,14 @@ class A2sGcloud{
     }); 
   }
 
+  /**
+   * Elimina un archivo
+   * 
+   * @param {ctx} arg - Objeto payload que recibe el metodo
+   * @param {string} arg.container - Nombre del contenedor donde se encuentra el archivo
+   * @param {string} arg.path - Path del archivo a eliminar
+   * @return {Promise<Object>}       Promesa con la información del archivo.    
+  */
   deleteFile(arg) {
     log.debug("deleteFile");
     var doc = {_id:arg.path};
@@ -279,20 +377,27 @@ class A2sGcloud{
         else{
           file.delete((err, apiResponse) => {
             if(err)reject(err)
-            else resolve(createFileResponseObject(undefined, metadata.name, metadata.size, metadata.mediaLink));
+            else resolve(createFileResponseObject(metadata.name, metadata.size, metadata.mediaLink));
           });
         }
       });
     });
   }
 
+  /**
+   * Elimina todos los archivos de un path específico 
+   * 
+   * @param {Object} arg              Objeto payload que recibe el metodo
+   * @param {String} arg.container    Nombre del contenedor donde se encuentra el archivo
+   * @param {String} arg.path         Nombre del path a Eliminar
+   * @return {Promise<Object>}        Promesa con la información de los archivos eliminados.
+  */
   deleteFiles(arg) {
     log.trace("deleteFiles");
-    //var doc = {_id:arg.file};
     return new Promise((resolve,reject) => {
       let options = {};
       if(arg.path){
-        options.prefix = arg.path;// = path.join(arg.container, arg.path);
+        options.prefix = arg.path;
       }
       var bucket = this.gcs.bucket(arg.container);
       bucket.deleteFiles(options ,err => {
@@ -302,6 +407,14 @@ class A2sGcloud{
     });
   }
 
+  /**
+   * Genera un token de acceso para GCloud
+   * 
+   * @param  {Object} _app        Objeto App del servidor
+   * @param  {Object} credentials Objeto con las credenciales de acceso para el servicio.
+   * @param  {Number} minTime     Duración requerida para el token. Como máximo se puede generar un token de media hora
+   * @return {Promise<Object>}    Promesa con el objeto con la información del token
+   */
   static genToken(_app, credentials, minTime){
     return new Promise((resolve, reject) => {
       if(!credentials){
@@ -336,49 +449,12 @@ class A2sGcloud{
 }
 
 
-
-function copyData(savPath, srcPath) {
-  return new Promise((resolve, reject) => {
-    fs.readFile(srcPath, (err, data) => {
-        if(err){
-          reject(err);
-        }else{
-          fs.writeFile(savPath, data, err => {
-            if(err){
-              reject(err);
-            }else{
-              log.debug('copy file end');
-              resolve();
-            }
-          });
-        }
-    });
-  });
-}
-
-// function download(savPath, url) {
-//   return new Promise(function(resolve, reject){
-//     var file = fs.createWriteStream(savPath);
-    
-//     request.get(url).on('error',function(err){
-//       reject(err);
-//     }).on('response',function(res){
-//       res.on('data', function(data) {
-//         file.write(data);
-//       }).on('end', function() {
-//         file.end();
-//         resolve();
-//       })
-//     });
-//   });
-// }
-
-
-// function newContainer(name, path, stat){
-//   return {_id:name, path:path, size:stat.size};
-// }
-
-
+/**
+ * Comprueba el estado de público de un archivo
+ * @private
+ * @param  {GCloud.File} file Archivo de GCloud
+ * @return {Promise<Boolean>} Promesa al estado de público del archivo
+ */
 function checkPublic(file){
   return new Promise((resolve,reject)=>{
     file.acl.get({entity:"allUsers"}, function(err, aclObject, apiResponse){
@@ -387,27 +463,33 @@ function checkPublic(file){
   });
 }
 
-function checkName(name){
-  log.debug("checkName");
-  log.debug(name);
-  if(name.indexOf("/") == -1)
-    return true;
-  else
-    return false;
-}
-
-function createFileResponseObject(subPath, relativePath, size, url, public = undefined){
+/**
+ * Crea un objeto con la información de un archivo
+ * @private
+ * @param  {String}  subPath      [description]
+ * @param  {String}  relativePath [description]
+ * @param  {Number}  size         [description]
+ * @param  {String}  url          [description]
+ * @param  {Boolean} isPublic     [description]
+ * @return {Object}               [description]
+ */
+function createFileResponseObject(relativePath, size, url, isPublic = undefined){
 
   var info = {_id:relativePath};
   info.size = size;
-  info.public = public; 
-  info.path = path.join(subPath || "",relativePath);
+  info.public = isPublic; 
+  info.path = relativePath;
   info.url = url;
 
   return info;
 }
 
-
+/**
+ * Crea un objeto con la información de un token de gcloud
+ * @private
+ * @param  {GCloud.token} gtoken Objeto token de google
+ * @return {Object}       Objeto con la informacion del token
+ */
 function createTokenData(gtoken){
   let tokenData;
   if(gtoken){

@@ -2,21 +2,25 @@ var fs = require('fs-extra');
 var recursive = require('recursive-readdir');
 var path = require('path');
 
-// var log = App.log.child({module:'local-storage'});
-
-// var fsPath = __dirname+"/../../app/fs";
-// var rootUrl = "http://localhost:5400/fs/";
-// var rootPath = "/Users/sergio.garcia/Desktop/Desarrollo/a2sadmin";
-// var rootPath = null;
-
 let App;
 let log;
 let rootUrl;
 
 var _defaultPath = "./storage";
 
-
+/**
+ * Servicio de almacenamiento local
+ * @private
+ * @memberOf module:tb-storage
+ */
 class A2sLocal{
+
+  /**
+   * Crea una instancia del servicio Local
+   * @param  {Object} _app                          Objeto App de la aplicación
+   * @param  {Object} [options]                     Objeto con la configuración del servicio
+   * @param  {String} [options.rootPath]            Path base en el que se almacenaran los archivos en local. Por defecto se almacenan bajo "./storage"
+   */
   constructor(_app, options){
 
     App = _app;
@@ -39,10 +43,25 @@ class A2sLocal{
     });
   }
 
+  /**
+   * Devuelve el path de un archivo almacenado en local
+   * @param  {Object} app       Objeto App de la aplicación
+   * @param  {String} container Nombre del contenedor en el que esta ubicado el archivo
+   * @param  {String} subPath   Path relativo al contenedor de la ubicación
+   * @return {String}           El path del archivo
+   */
   static getLocalPath(app, container, subPath){
     return path.join(app.basePath, "..", _defaultPath, container, subPath);
   }
 
+
+  /**
+   * Crea un contenedor de archivos
+   * @param {Object} arg            - Objeto payload que recibe el metodo
+   * @param {String} arg.container  - Nombre del contenedor a crear
+   * 
+   * @return {Promise<Object>} Promesa con la información del contenedor
+  */
   createContainer(arg) {
     log.debug("createContainer");
     return new Promise((resolve, reject) => {
@@ -70,6 +89,13 @@ class A2sLocal{
     });
   }
 
+  /**
+   * Obtiene información de un contenedor
+   * 
+   * @param {Object} arg            Objeto payload que recibe el metodo
+   * @param {String} arg.container  Nombre del contenedor
+   * @return {Promise<Object>}      Promesa con la información del contenedor.    
+  */
   getContainerInfo(arg) {
     log.debug("getContainerInfo");
     return new Promise((resolve,reject) => {
@@ -86,8 +112,15 @@ class A2sLocal{
     });
   }
 
+  /**
+   * Elimina un contenedor
+   * 
+   * @param {Object} arg             Objeto payload que recibe el metodo
+   * @param {String} arg.container   Nombre del contenedor que deseamos eliminar
+   * @param {Boolean} arg.force      Flag para indicar si la eliminación es forzada
+   * @return {Promise<Object>}       Promesa con la información del contenedor.    
+  */
   deleteContainer(arg) {
-    // var mypath = __dirname+"/../../app/fs/"+arg.container;
     log.debug("deleteContainer");
     return new Promise((resolve,reject) => {
       var mypath = createFilePath(this.rootPath, undefined, arg.container);
@@ -104,6 +137,10 @@ class A2sLocal{
     });
   }
 
+  /**
+   * Obtiene todos los contenedores
+   * @return {Promise<Array>}  Promesa con los contenedores cargados
+  */
   getContainers() {
     log.debug("getContainers");
     return new Promise((resolve,reject) => {
@@ -129,10 +166,23 @@ class A2sLocal{
     });
   }
 
+  /**
+   * Devuelve el path base del servicio
+   * @return {String} El path base
+   */
   getRootPath(){
     return this.rootPath;
   }
 
+  /**
+   * Permite almacenar un archivo en el contenedor indicado
+   * 
+   * @param {Object}  arg             - Objeto payload que recibe el metodo
+   * @param {string}  arg.container   - nombre del contenedor sera guardado el archivo
+   * @param {string}  arg.path        - nombre con el cual se guardará el archivo (formato test/test1/text.txt)
+   * @param {File}    arg.file        - Objeto que representa al archivo que deseamos guardar
+   * @return {Promise<Object>}       Promesa con la información del archivo.  
+  */
   uploadFile(arg) {
     log.debug("uploadFile");
     return new Promise((resolve,reject) => {
@@ -159,12 +209,7 @@ class A2sLocal{
             if(err){
               reject(App.err.notFound("file not found"))
             }else{   
-              let respObj = createFileResponseObject(arg.container, undefined, dest, stat.mtime, stat.size, true);
-              // let respObj = {
-              //   _id:dest,
-              //   path:createFilePath(rootUrl, arg.container, dest),
-              //   public: true //De momento lo locales son siempre public  
-              // }
+              let respObj = createFileResponseObject(arg.container, undefined, dest, stat.mtime, stat.size, true, !stat.isFile());
               resolve(respObj);
               fs.remove(file, err => log.debug("upload temp borrado"));
             }
@@ -174,23 +219,25 @@ class A2sLocal{
     });
   }
 
+  /**
+   * Obtiene todos los archivos de una ubicación
+   * 
+   * @param {Object} arg           - Objeto payload que recibe el metodo
+   * @param {String} arg.container - Nombre del contenedor donde se encuentra dicho archivo
+   * @param {String} arg.path      - Path del que se quiere obtener la informacion
+   * @return {Promise<Array>}     Devuelve una promesa al array con información sobre todos los archivos de la ubicacion indicada
+  */
   getFiles(arg){
-    // var rootUrl = "http://192.168.1.36:4500/fs/";
     log.debug("getFiles");
-    // var container = {_id:name,path:rootUrl+name};
     return new Promise((resolve,reject) =>{
      
       var mypath = this.rootPath+"/";
-      if(arg.container){
+      if(arg.container)
         mypath =  path.join(mypath,arg.container)+"/";
-      }
-
-      if(arg.path){
+      
+      if(arg.path)
         mypath = path.join(mypath,arg.path);
-      }
-
-      // let baseFileUrl = createFilePath(rootUrl, arg.container, arg.path);
-
+  
       fs.stat(mypath, (err,stat) => {
         if(err){
           reject(new Error("path not found"));
@@ -201,18 +248,9 @@ class A2sLocal{
               files.forEach(filePath => {
                 var stat = fs.statSync(filePath);
                 if(stat.isFile()){
-                  //quitar dirname de la url
                   filePath = filePath.replace(rootPath,"");
-                  // log.debug(filePath);
-                  // var name = filePath.substr(filePath.indexOf(arg.container)+arg.container.length+1);
-                  var info = createFileResponseObject(arg.container, arg.path, filePath, stat.mtime, stat.size, true);
-                  // var name = filePath;
-                  // var info = {_id:name};
-                  // info.mtime = stat.mtime.getTime()/1000;
-                  // info.size = stat.size;
-                  // info.public = true; //De momento lo locales son siempre public
-                  // info.path = filePath;
-                  // info.url = createFilePath(baseFileUrl,filePath);
+
+                  var info = createFileResponseObject(arg.container, arg.path, filePath, stat.mtime, stat.size, true, !stat.isFile());
                   respFiles.push(info);
                 }
               });
@@ -223,23 +261,8 @@ class A2sLocal{
             fs.readdir(mypath, (err,files) => {
               var respFiles = [];
               files.forEach( filePath => {
-                var isDir = true;
-                var stat = fs.statSync(mypath+filePath);
-                if(stat.isFile()){
-                  //quitar dirname de la url
-                  isDir = false;
-                }
-                var info = createFileResponseObject(arg.container, arg.path, filePath, stat.mtime, stat.size, true);
-
-                // var name = filePath;
-                // var info = {_id:name};
-                // info.type = "file";
-                // if(isDir) info.type = "dir";
-                // info.mtime = stat.mtime.getTime()/1000;
-                // info.size = stat.size;
-                // info.public = true; //De momento lo locales son siempre public
-                // info.path = filePath;
-                // info.url = createFilePath(baseFileUrl,filePath);
+                var stat = fs.statSync(mypath+filePath);      
+                var info = createFileResponseObject(arg.container, arg.path, filePath, stat.mtime, stat.size, true, !stat.isFile());
                 respFiles.push(info);
               });
               resolve(respFiles);
@@ -250,21 +273,24 @@ class A2sLocal{
     });
   }
 
+  /**
+   * Obteniene información sobre un archivo
+   * 
+   * @param {Object} arg - Objeto Payload que recibe el metodo
+   * @param {String} arg.container - Nombre del contenedor donde se encuentra dicho archivo
+   * @param {String} arg.path - Nombre del archivo
+   *
+   * @return {Promise<Object>} Promesa con la información del archivo
+  */
   getFileInfo(arg) {
-    // var mypath = __dirname+"/../../app/fs/"+arg.container+"/"+arg.file;
     log.debug("getFileInfo");
-    // var info = {_id:arg.path};
-    // log.debug(mypath);
     return new Promise( (resolve,reject) => {
       let pathFile = createFilePath(this.rootPath, arg.container, arg.path);
       fs.stat(pathFile, (err,stat) => {
         if(err){
           reject(App.err.notFound("file not found"))
         }else{   
-          var info = createFileResponseObject(arg.container, undefined, arg.path, stat.mtime, stat.size, true);
-          // info.mtime = stat.mtime.getTime()/1000;
-          // info.size = stat.size;
-          // info.public = true; //De momento lo locales son siempre public
+          var info = createFileResponseObject(arg.container, undefined, arg.path, stat.mtime, stat.size, true, !stat.isFile());
           log.debug(info);
           resolve(info);
         }
@@ -272,6 +298,10 @@ class A2sLocal{
     });
   }
 
+  /**
+   * Mueve un archivo de una ubicación a otra
+   * @private
+   */
   moveFile(arg) {
     log.debug("moveFile");    
     return new Promise( (resolve,reject) => {
@@ -291,7 +321,7 @@ class A2sLocal{
                 if(err){
                   reject(App.err.notFound("container not found"));
                 }else{
-                  var info = createFileResponseObject(arg.container, undefined, arg.destFile, stat.mtime, stat.size, true);
+                  var info = createFileResponseObject(arg.container, undefined, arg.destFile, stat.mtime, stat.size, true,!stat.isFile());
                   // info.mtime = stat.mtime.getTime()/1000;
                   // info.size = stat.size;
                   // info.public = true; //De momento lo locales son siempre public
@@ -306,6 +336,10 @@ class A2sLocal{
     });
   }
 
+  /**
+   * Copia un archivo de una ubicación a otra
+   * @private
+  */
   copyFile(arg) {
     log.debug("copyFile");
     return new Promise( (resolve,reject) => {
@@ -325,7 +359,7 @@ class A2sLocal{
                 if(err){
                   reject(App.err.notFound("container not found"));
                 }else{
-                  var info = createFileResponseObject(arg.container, undefined, arg.destFile, stat.mtime, stat.size, true);
+                  var info = createFileResponseObject(arg.container, undefined, arg.destFile, stat.mtime, stat.size, true, !stat.isFile());
                   // info.mtime = stat.mtime.getTime()/1000;
                   // info.size = stat.size;
                   // info.public = true; //De momento lo locales son siempre public
@@ -340,6 +374,15 @@ class A2sLocal{
     });
   }
 
+  /**
+   * Permite obtener un archivo del servidor
+   * 
+   * @param {Object} arg                Objeto payload que recibe el metodo
+   * @param {String} arg.container      Nombre del contenedor donde se encuentra dicho archivo (opcional)
+   * @param {String} arg.path           Nombre del archivo que se desea descargar
+   * @param {Stream.Writable} arg.res   Flujo por donde se devuelve el fichero
+   * @return {Promise} Una promesa
+  */
   getFile(arg){
     log.debug("getFile");
     return new Promise((resolve, reject) => {
@@ -347,9 +390,7 @@ class A2sLocal{
 
       log.debug(pathFile);
       var readStream = fs.createReadStream(pathFile);
-      log.debug("readStream");
       readStream.pipe(arg.res);
-      log.debug("readStream pipe");
       readStream.on('error', function(error){
         log.debug(error);
         reject(error);
@@ -361,6 +402,14 @@ class A2sLocal{
     }); 
   }
 
+  /**
+   * Elimina un archivo
+   * 
+   * @param {ctx} arg - Objeto payload que recibe el metodo
+   * @param {string} arg.container - Nombre del contenedor donde se encuentra el archivo
+   * @param {string} arg.path - Path del archivo a eliminar
+   * @return {Promise<Object>}       Promesa con la información del archivo.    
+  */
   deleteFile(arg) {
     log.debug("deleteFile");
     // var doc = {_id:arg.path};
@@ -375,12 +424,11 @@ class A2sLocal{
         }else{
           fs.unlink(pathFile, err => {
             cleanFromDirToDir(containerPath, path.parse(pathFile).dir)
-              .then(cleaned =>{
-                // if(arg.clean) cleanPath(containerPath); //se limpia el 
+              .then(cleaned =>{    
                 if(err){
                   reject(err);
                 }else {
-                  var info = createFileResponseObject(arg.container, undefined, arg.path, stat.mtime, stat.size, true);
+                  var info = createFileResponseObject(arg.container, undefined, arg.path, stat.mtime, stat.size, true, !stat.isFile());
                   resolve(info)
                 };
               })
@@ -390,26 +438,27 @@ class A2sLocal{
     });
   }
 
-
-   deleteFiles(arg) {
+  /**
+   * Elimina todos los archivos de un path específico 
+   * 
+   * @param {Object} arg              Objeto payload que recibe el metodo
+   * @param {String} arg.container    Nombre del contenedor donde se encuentra el archivo
+   * @param {String} arg.path         Nombre del path a Eliminar
+   * @return {Promise<Object>}        Promesa con la información de los archivos eliminados.
+  */
+  deleteFiles(arg) {
     log.debug("deleteFiles");
  
     return new Promise((resolve,reject) => {
       let containerPath = createFilePath(this.rootPath, arg.container, undefined);
       var pathDir = createFilePath(containerPath,arg.path);
 
-      // cleanPath(pathDir);
       fs.readdir(pathDir, (err, files) => {
         if (err){
           reject(error)
         }else{
           files.forEach( file => {
              fs.unlinkSync(path.join(pathDir, file));
-
-            //  fs.unlink(path.join(pathDir, file), err => {
-            //   if (err) throw error;
-              
-            // });
           });
           cleanFromDirToDir(containerPath, pathDir);
           resolve();
@@ -418,6 +467,15 @@ class A2sLocal{
     });
   }
 
+  /**
+   * No disponible.
+   * Cambia el estado de publico del archivo.
+   * @param  {Object} arg            Objeto con la informacion necesaria
+   * @param  {String} arg.container  Nombre del contenedor del archivo
+   * @param  {String} arg.path       Path del archivo
+   * @param  {String} arg.public     Nuevo estado de público del archivo
+   * @return {Promise<Object>}       Promesa con la información del archivo.    
+  */
   makeFilePublic(arg) {
     log.debug("makeFilePublic");
     return new Promise((resolve,reject) => {
@@ -427,6 +485,10 @@ class A2sLocal{
 
 }
 
+/**
+ * Copia un archivo en otra ubicacion
+ * @private
+ */
 function copyData(savPath, srcPath) {
   return new Promise((resolve, reject) => {
     fs.readFile(srcPath, (err, data) => {
@@ -447,26 +509,27 @@ function copyData(savPath, srcPath) {
 }
 
 
-function cleanPath(path){
-  log.debug("entra en clean");
-  fs.readdir(path, (err,folders) => {
-    folders.forEach( folder => {
-      var localPath = path+"/"+folder;
-      var stat = fs.statSync(localPath);
-      if(stat.isDirectory()){
-        fs.readdir(localPath,(err,subFolders) => {
-          if(subFolders.length == 0)
-            fs.rmdir(localPath);
-          else
-            cleanPath(localPath);
-        });
-      }
-    });
-  });
-}
+// function cleanPath(path){
+//   log.debug("entra en clean");
+//   fs.readdir(path, (err,folders) => {
+//     folders.forEach( folder => {
+//       var localPath = path+"/"+folder;
+//       var stat = fs.statSync(localPath);
+//       if(stat.isDirectory()){
+//         fs.readdir(localPath,(err,subFolders) => {
+//           if(subFolders.length == 0)
+//             fs.rmdir(localPath);
+//           else
+//             cleanPath(localPath);
+//         });
+//       }
+//     });
+//   });
+// }
 
 /**
  * Elimina la ruta entre containerPath y dirPath si los directorios estan vacíos completamente 
+ * @private
  * @param  {String} startDir  Directorio a partir del que se quiere limpiar 
  * @param  {String} endDir    Subdirectorio de startDir con el que forma la ruta que se quiere limpiar 
  * @return {Promise}          Promesa que indica si se pudo limpiar o no la ruta
@@ -497,6 +560,12 @@ function cleanFromDirToDir(startDir, endDir){
 //   return {_id:name, path:path, size:stat.size};
 // }
 
+/**
+ * Comprueba que el nombre de un contenedor este permitido
+ * @private
+ * @param  {String} name Nombre del contenedor
+ * @return {Boolean}  Indica si es correcto o no
+ */
 function checkName(name){
   log.debug("checkName");
   log.debug(name);
@@ -509,6 +578,7 @@ function checkName(name){
 
 /**
  * Crea un path basado en los componentes pasados
+ * @private
  * @param  {String} rootDir  root del path
  * @param  {String} subpath  subpath entre root y el filename
  * @param  {String} fileName nombre del archivo
@@ -536,17 +606,30 @@ function createFilePath(rootDir, subpath, fileName){
   return filePath;
 }
 
-
-function createFileResponseObject(container, subPath, relativePath, mtime, size, public = true, isDir = false){
+/**
+ * Crea un objeto con la información de un archivo
+ * @private
+ * @param  {String}  container    Nombre del contenedor
+ * @param  {String}  subPath      Subpath desde el contenedor hasta el archivo
+ * @param  {String}  relativePath Path del archivo a partir del subPath
+ * @param  {Number}  mtime        Ultima fecha de modificación
+ * @param  {Number}  size         Tamaño del archivo
+ * @param  {Boolean} isPublic     Indica si el archivo es public o no
+ * @param  {Boolean} isDir        Indica si es una carpeta o no
+ * @return {Object}               Un objeto con la información del archivo
+ */
+function createFileResponseObject(container, subPath, relativePath, mtime, size, isPublic = true, isDir = false){
   let baseUrl = createFilePath(rootUrl, container, subPath);
 
   var info = {_id:relativePath};
   info.type = isDir ? "dir": "file";
   info.mtime = mtime.getTime()/1000;
   info.size = size;
-  info.public = public; //De momento lo locales son siempre public
+  info.public = isPublic; //De momento lo locales son siempre public
   info.path = path.join(subPath || "",relativePath);
-  info.url = createFilePath(baseUrl,relativePath);
+  if(!isDir){
+    info.url = createFilePath(baseUrl,relativePath);
+  }
 
   return info;
 }
