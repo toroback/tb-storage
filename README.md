@@ -14,18 +14,18 @@ Para utilizar almacenamiento local en el servidor no es necesario configurar nin
 + Google Cloud (gcloud)
 + Amazon AWS S3 (aws)
 
-La configuracion de cualquier servicio se realiza en el archivo config.json que se encuentra en la carpeta "app".
+La configuración de cualquier servicio se realiza en el archivo config.json que se encuentra en la carpeta "app".
 
 ### **- Configuración de GCloud**
 
-#### **• Desde la interfaz de administración A2Server**
+#### **• Configuración desde interfaz administrativa:** 
 En la aplicación seleccionada acceder a la sección "Configuración" y luego a la pestaña "Almacenamiento".
 
 Una vez en la pestaña en la sección de Google Cloud añadir el archivo keyFile.json pulsando el botón "Selecciona Google Cloud key" e introduce el id de proyecto GCloud.
 
 
-#### **• Configuracion manual**
-Colocar el archivo keyFile.json en una carpeta llamada "cert" en la raiz del proyecto o en una subcarpeta de la misma.
+#### **• Configuración manual**
+Colocar el archivo keyFile.json en una carpeta llamada "cert" en la raíz del proyecto o en una subcarpeta de la misma.
       
 **- Ejemplo en cert:**
 ```
@@ -74,7 +74,7 @@ De esta manera, si el keyFile de gcloud se encuentre en el directorio "root/app/
 
 ### **- Configuración de Amazon AWS S3**
 
-#### **• Desde la interfaz de administración A2Server**
+#### **• Configuración desde interfaz administrativa:** 
 En la aplicación seleccionada acceder a la sección "Configuración" y luego a la pestaña "Almacenamiento".
 
 Una vez en la pestaña "Almacenamiento", en la sección de Amazon AWS S3 es necesario introducir:
@@ -82,7 +82,7 @@ Una vez en la pestaña "Almacenamiento", en la sección de Amazon AWS S3 es nece
   - Access Key ID: Clave de acceso de Amazon.
   - Secret Acces Key: Clave secreta de Amazon.
 
-#### **• Configuracion manual**
+#### **• Configuración manual**
 La configuración se realiza en el archivo config.json. Para ello es necesario añadir el objeto "storageOptions" si no disponemos de él y luego agregar un objeto en él con la configuración para Amazon.
 
 El objeto de la configuración de Amazon tiene las siguientes propiedades:
@@ -115,11 +115,12 @@ Un ejemplo de configuración es:
 
 Los servicios de almacenamiento se pueden utilizar de dos maneras:
 
-**- Mediante llamadas internas al modelo (Servidor):**
+**- Mediante Class Api del modelo (Servidor):**
 
-Utilizando las funcinoes de ***App.Storage***
+Utilizando las funciones de ***App.Storage***
 
 - Ejemplo:
+
 ```
 var service = "local"; // Servicio de almacenamiento
 var Storage = new App.Storage(service);
@@ -277,6 +278,7 @@ DELETE:  `https://a2server.a2system.net:1234/api/v1/srv/storage?service=gcloud&c
 |args.force| Boolean||Flag que fuerza la eliminacion aunque tenga archivos almacenados|
 
 **Ejemplo:**
+
 ```javascript
 var service = "gcloud";
 var args = {
@@ -290,6 +292,7 @@ Storage.deleteContainer(args)
 ```
 
 * Respuesta:
+
 ```javascript
 {
   "container": {
@@ -393,7 +396,7 @@ Storage.getContainers()
 |path|String||Path destino relativo al contenedor del archivo que se va a subir incluyendo el nombre y extensión del mismo.|
 |fileUpload|File|| Archivo que se va a subir.|
 
->NOTA: Es necesario pasar una de las dos opciones. Servicio y contenedor ó refencia.
+>NOTA: Es necesario pasar una de las dos opciones. Servicio y contenedor ó referencia.
 
 **Respuesta:**
 
@@ -1011,7 +1014,7 @@ Storage.makeFilePublic(payload)
 
 En ocaciones, para poder visualizar u obtener archivos privados almacenados en un servicio es necesario utilizar un token de acceso a él.
 
-Para conseguir un access token hay que indicar el servicio para el que se desea obtener y el tiempo minimo de duracion requerido. Por ahora el máximo es de 1 hora.
+Para conseguir un access token hay que indicar el servicio para el que se desea obtener y el tiempo mínimo de duración requerido. Por ahora el máximo es de 1 hora.
 
 A continuación veremos cómo se hace a través de una petición REST y cómo a través de código Javascript.
 
@@ -1027,7 +1030,7 @@ A continuación veremos cómo se hace a través de una petición REST y cómo a 
 
 | Clave | Tipo | Opcional   | Descripción  |
 |---|---|:---:|---|
-|service|String|Servicio de almacenamiento (valores: local, gcloud, aws)|
+|service|String||Servicio de almacenamiento (valores: local, gcloud, aws)|
 |mintime|Number|X| Duracion minima que debe tener el token. Como máximo el token puede ser de una hora.|
 
 **Respuesta:**
@@ -1082,7 +1085,7 @@ App.Storage.genToken(service, minTime)
   }
 ```
 
-## **Uso de referencia**
+## **Uso de referencias**
 Una referencia es una manera de identificar un punto de almacenamiento.
 Dicho punto de almacenamiento estará formado por:
   - Un servicio.
@@ -1091,12 +1094,12 @@ Dicho punto de almacenamiento estará formado por:
 
 De esta manera, utilizando una referencia, no es necesario conocer los detalles de la ubicación en la que se almacenaran los archivos desde los distintos clientes. 
 
-Para utilizar referencias primero hay que registrar las distintas referencias que se vayan a utilizar desde el servidor y luego realizar las peticiones, que soporten paso de referencias, con la referencia desesada.
+Para utilizar referencias primero hay que registrar las distintas referencias que se vayan a utilizar desde el servidor y luego realizar las peticiones con la referencia deseada, si ésta está soportada.
 
 
 Un posible escenario de uso de referencias es el siguiente:
 
-Supongamos que nuestro servidor ofrece almacenamiento de imágenes de perfil de usuarios en GCloud en un contendor que se llama users_pictures en una carpeta llamada "profile". Con lo que tendríamos:
+Supongamos que nuestro servidor ofrece almacenamiento de imágenes de perfil de usuarios en GCloud en un contenedor que se llama users_pictures en una carpeta llamada "profile". Con lo que tendríamos:
   - Servicio : GCloud
   - Contenedor : users_pictures
   - Path : "profile/"
@@ -1135,12 +1138,12 @@ function Boot(){
   App.Storage.setReferences(references);
 }
 ```
-å
-### **Convertir ubicacion con referencia a ubicacion con servicio**
 
-Si necesitamos trabajar con referencias desde nuestro servidor tendremos que transformar una ubicación con referencia a una ubicación con servicio. Esto es, obtener el servicio, contendor y subpath para una referencia.
+### **Convertir ubicación con referencia a ubicación con servicio**
 
-Esto se puede realizar con la funcion "toServiceObject(referenceObject)" de Storage.
+Si necesitamos trabajar con referencias desde nuestro servidor tendremos que transformar una ubicación con referencia a una ubicación con servicio. Esto es, obtener el servicio, contenedor y subpath para una referencia.
+
+Esto se puede realizar con la función "toServiceObject(referenceObject)" de Storage.
 
 El parámetro de entrada es un objeto que contiene el nombre de la referencia y un path opcional relativo a la referencia.
 
