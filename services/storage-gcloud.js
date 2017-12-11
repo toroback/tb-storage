@@ -1,5 +1,6 @@
-var gcloud = require('gcloud');
-var fs = require('fs-extra');
+
+var storage = require('@google-cloud/storage');
+// var fs = require('fs-extra');
 var path = require('path');
 
 let App;
@@ -31,10 +32,17 @@ class A2sGcloud{
     this.options = options;
     log.trace("A2sGcloud INIT");
     log.debug(options);
-    this.gcs = gcloud.storage({
+
+    // this.gcs = gcloud.storage({
+    //   projectId: options.projectId,
+    //   keyFilename: path.join(keyFilePath,options.keyFile.cert)
+    // });
+
+    this.gcs = storage({
       projectId: options.projectId,
       keyFilename: path.join(keyFilePath,options.keyFile.cert)
     });
+
   }
 
   /**
