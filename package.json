@@ -1,6 +1,6 @@
 {
   "name": "tb-storage",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Toroback Storage Module",
   "main": "index.js",
   "scripts": {
