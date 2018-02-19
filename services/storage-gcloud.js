@@ -166,13 +166,18 @@ class A2sGcloud{
 
       bucket.upload(file,options,(err,f) => {
         if(!err){
+         
+          let callback = (err, resp) => { 
+            let obj = createFileResponseObject(f.metadata.name, f.metadata.size, f.metadata.mediaLink, arg.public);
+            resolve(obj); 
+          };
+
           if(arg.public){
-            f.makePublic((err, resp) => {});
+            f.makePublic(callback);
           }else{
-            f.makePrivate({strict: true},(err, resp) => {});
+            f.makePrivate({strict: true},callback);
           }
-          let obj = createFileResponseObject(f.metadata.name, f.metadata.size, f.metadata.mediaLink, arg.public);
-          resolve(obj);
+          
         }else{
           reject(err);
         }
