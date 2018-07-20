@@ -161,7 +161,7 @@ class A2sGcloud{
       var file = arg.file.path;
       // log.debug(file,arg.container);
       var bucket = this.gcs.bucket(arg.container);
-      var dest = arg.path;
+      // var dest = arg.path;
       var options = { destination: arg.path };
 
       bucket.upload(file,options,(err,f) => {
@@ -289,6 +289,31 @@ class A2sGcloud{
       }else{
         file.makePrivate({strict: true},callback);
       }
+    });
+  }
+
+  setFileMetadata(arg){
+    return new Promise((resolve, reject) => {
+      var bucket = this.gcs.bucket(arg.container);
+      var file = bucket.file(arg.path);
+
+      file.setMetadata(arg.metadata,(err, apiResponse) =>{
+        if(err){
+          log.error("setFileMetadata", JSON.stringify(err));
+          reject(err);
+        }else{
+          file.getMetadata((err, metadata, apiResponse) => {
+            if(err){
+              reject(err);
+            }else if(metadata){
+              let obj = createFileResponseObject(metadata.name, metadata.size, metadata.mediaLink);
+              resolve(obj);
+            }else{
+              reject(new Error("Metadata not found"));
+            }
+          });
+        }
+      })
     });
   }
 

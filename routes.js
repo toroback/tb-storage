@@ -1,10 +1,6 @@
 
 
-let router = new require('express').Router();
-let multer = require('multer');
-let path = require('path');
-var appDir = path.dirname(require.main.filename);
-let upload = multer({dest:appDir+'/../uploads'});
+let router = require('express').Router();
 // TODO: this require needs to be fixed. re-structure.
 let Storage = require('./index.js');
 let storage = new Storage( );
@@ -201,7 +197,7 @@ function setupRoutes(App){
    *
    *          
    */
-  router.post("/upload",upload.single('fileUpload'),function(req, res, next){
+  router.post("/upload", Storage.multer.single('fileUpload'),function(req, res, next){
     log.trace("entra en upload file");
     log.debug(req.file);
     log.debug(req.body.path);
@@ -456,7 +452,7 @@ function processArgs(arg){
       delete newArgs.container;
 
       if(newArgs.reference && newArgs.arg){
-        newArgs.path = path.join(newArgs.arg,newArgs.path);
+        newArgs.path = require('path').join(newArgs.arg,newArgs.path);
       }
 
       let data = Storage.toServiceObject({reference: newArgs.reference, path: newArgs.path})

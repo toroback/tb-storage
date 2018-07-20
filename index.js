@@ -16,7 +16,8 @@
 
 
 var path = require('path');
-  
+let multer = require('multer');
+var appDir = path.dirname(require.main.filename);
 
 let App;      // reference to toroback
 let log;      // logger (toroback's child)
@@ -100,7 +101,7 @@ class Storage{
    */
   static toServiceObject(referenceObject) {
     let reference = storageReferences[referenceObject.reference];
-    if(!reference) throw new Error("Reference not valid");
+    if(!reference) throw App.err.notFound('Reference not found: ' + referenceObject.reference);// new Error("Reference not valid");
 
     let serviceObject = {
       service:   reference.service,
@@ -339,7 +340,7 @@ class Storage{
    * Permite almacenar un archivo en el contenedor indicado
    * 
    * @param {arg}     arg             - Objeto payload que recibe el metodo
-   * @param {string}  arg.container   - nombre del contenedor sera guardado el archivo
+   * @param {string}  arg.container   - nombre del contenedor donde será guardado el archivo
    * @param {string}  arg.path        - nombre con el cual se guardará el archivo (formato test/test1/text.txt)
    * @param {File}    arg.file        - Objeto que representa al archivo que deseamos guardar
    * @param {Boolean} arg.public      - Indica si el archivo será publico o no
@@ -452,7 +453,35 @@ class Storage{
         })
         .catch(reject); 
     });
+  };
+
+  /**
+   * Establece los metadatos  del archivo
+   * @param  {Object} arg            Objeto con la informacion necesaria
+   * @param  {String} arg.container  Nombre del contenedor del archivo
+   * @param  {String} arg.path       Path del archivo
+   * @param  {String} arg.metadata   Objeto que contendrá los metadatos a establecer   
+   * @param  {String} arg.metadata.metadata   Objeto con metadatos personalizados para el objeto
+   * @return {Promise<Object>}       Promesa con la información del archivo.    
+  */
+  setFileMetadata(arg){
+    return new Promise((resolve, reject) => {
+      arg = normalizeArgs(this.service, arg);
+      checkContainer(arg);
+
+      if(!arg.metadata){
+        reject(App.err.badRequest("metadata property not found"));
+      }else{
+        this.getFsObject().setFileMetadata(arg)
+          .then(doc => {
+            let obj = createFileForResponse(this.service, arg, doc.path, doc.url, arg.public);
+            resolve({file:obj});
+          })
+          .catch(reject); 
+      }
+    });
   }
+
 
 }
 
@@ -513,5 +542,7 @@ function checkContainer(loc){
   if(!loc.container)
     throw new Error(loc.reference ? "Cannot find container for reference" : "You must provide a container or a reference");
 }
+
+Storage.multer = multer({dest:appDir+'/../uploads'});
 
 module.exports = Storage;

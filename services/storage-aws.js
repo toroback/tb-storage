@@ -255,6 +255,13 @@ class A2sAWSStorage{
     });
   }
 
+  setFileMetadata(arg) {
+    log.debug("setFileMetadata");
+    return new Promise((resolve,reject) => {
+      reject(new Error("Operation not allowed for amazon files")); // TODO: provisionalmente no se puede cambiar para local
+    });
+  }
+
   /**
    * Mueve un archivo de una ubicación a otra
    * @private

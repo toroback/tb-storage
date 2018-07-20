@@ -104,7 +104,7 @@ class A2sLocal{
       fs.stat(mypath,(err,stat) => {
         if(err){
           console.log(err);
-          reject(App.err.notFound("container not found"));
+          reject(App.err.notFound("container not found - " + arg.container));
         }else{          
           resolve({_id:arg.container, size:stat.size});
         }
@@ -126,7 +126,7 @@ class A2sLocal{
       var mypath = createFilePath(this.rootPath, undefined, arg.container);
       fs.stat(mypath, (err,stat) => {
         if(err){
-          reject(new Error("container not found"));
+          reject(App.err.notFound("container not found - " + arg.container));
         }else{
           fs.remove(mypath, err => {
             if(err)reject(err);
@@ -210,8 +210,11 @@ class A2sLocal{
               reject(App.err.notFound("file not found"))
             }else{   
               let respObj = createFileResponseObject(arg.container, undefined, dest, stat.mtime, stat.size, true, !stat.isFile());
-              resolve(respObj);
-              fs.remove(file, err => log.debug("upload temp borrado"));
+            
+              fs.remove(file, err => {
+                log.debug("upload temp borrado. error:" + err);
+                resolve(respObj);
+              });
             }
           });
         })
@@ -240,7 +243,7 @@ class A2sLocal{
   
       fs.stat(mypath, (err,stat) => {
         if(err){
-          reject(new Error("path not found"));
+          reject(App.err.notFound("path not found"));
         }else{
           if(arg.recursive){
             recursive(mypath, [".*" ], (err, files) => {
@@ -287,9 +290,8 @@ class A2sLocal{
     return new Promise( (resolve,reject) => {
       let pathFile = createFilePath(this.rootPath, arg.container, arg.path);
       fs.stat(pathFile, (err,stat) => {
-        if(err){
-          reject(App.err.notFound("file not found"))
-        }else{   
+        if(err) reject(App.err.notFound("file not found"))
+        else{   
           var info = createFileResponseObject(arg.container, undefined, arg.path, stat.mtime, stat.size, true, !stat.isFile());
           log.debug(info);
           resolve(info);
@@ -309,18 +311,15 @@ class A2sLocal{
       let newFile = createFilePath(this.rootPath, arg.container, arg.destFile);
 
       fs.stat(oldFile, (err,stat) => {
-        if(err){
-          reject(new Error("file not found"));
-        }else{
+        if(err) reject(App.err.notFound("file not found"));
+        else{
           fs.move(oldFile, newFile, err => {
-            if(err){
-              reject(new Error("file not found"));
-            }else{
+            if(err) reject(App.err.notFound("file not found"));
+            else{
               // var info = {_id:arg.destFile};
               fs.stat(newFile, (err,stat) => {
-                if(err){
-                  reject(App.err.notFound("container not found"));
-                }else{
+                if(err) reject(App.err.notFound("container not found"));
+                else{
                   var info = createFileResponseObject(arg.container, undefined, arg.destFile, stat.mtime, stat.size, true,!stat.isFile());
                   // info.mtime = stat.mtime.getTime()/1000;
                   // info.size = stat.size;
@@ -347,18 +346,15 @@ class A2sLocal{
       let newFile = createFilePath(this.rootPath, arg.container, arg.destFile);
 
       fs.stat(oldFile, (err,stat) => {
-        if(err){
-          reject(new Error("file not found"));
-        }else{
+        if(err) reject(App.err.notFound("file not found"));
+        else{
           fs.copy(oldFile, newFile, err => {
-            if(err){
-              reject(new Error("file not found"));
-            }else{
+            if(err) reject(App.err.notFound("file not found"));
+            else{
               // var info = {_id:arg.destFile};
               fs.stat(newFile, (err,stat) => {
-                if(err){
-                  reject(App.err.notFound("container not found"));
-                }else{
+                if(err) reject(App.err.notFound("container not found"));
+                else{
                   var info = createFileResponseObject(arg.container, undefined, arg.destFile, stat.mtime, stat.size, true, !stat.isFile());
                   // info.mtime = stat.mtime.getTime()/1000;
                   // info.size = stat.size;
@@ -478,6 +474,13 @@ class A2sLocal{
   */
   makeFilePublic(arg) {
     log.debug("makeFilePublic");
+    return new Promise((resolve,reject) => {
+      reject(new Error("Operation not allowed for local files")); // TODO: provisionalmente no se puede cambiar para local
+    });
+  }
+
+  setFileMetadata(arg) {
+    log.debug("setFileMetadata");
     return new Promise((resolve,reject) => {
       reject(new Error("Operation not allowed for local files")); // TODO: provisionalmente no se puede cambiar para local
     });
