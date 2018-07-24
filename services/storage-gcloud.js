@@ -162,7 +162,7 @@ class A2sGcloud{
       // log.debug(file,arg.container);
       var bucket = this.gcs.bucket(arg.container);
       // var dest = arg.path;
-      var options = { destination: arg.path };
+      var options = { destination: arg.path, metadata: {contentType: arg.file.mimetype} };
 
       bucket.upload(file,options,(err,f) => {
         if(!err){
